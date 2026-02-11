@@ -465,3 +465,46 @@ Every state-changing command follows the same pattern:
 5. Exit
 
 This ensures state files, Notification Center, and sketchybar are always in sync.
+
+## Test Plan
+
+### Why unit tests aren't practical
+
+`Commands` has two properties that make unit testing infeasible:
+
+1. **Every method calls `exit()`** — `exit(0)` or `exit(1)` terminates the test runner process itself. There is no way to intercept or suppress `exit()` in Swift without process-level isolation.
+
+2. **Hard dependencies on system services** — `Commands` instantiates `NotificationManager` (which calls `UNUserNotificationCenter`) and `ShellHelper` (which spawns real processes) as static properties. These cannot be swapped in tests without protocol-based injection.
+
+Even read-only commands like `list`, `count`, and `help` call `exit(0)` after printing, which would kill the test process.
+
+### What manual/integration verification covers
+
+The Verification section above provides comprehensive CLI-level testing for all 7 commands:
+- **add**: Creates state file, sends notification, triggers sketchybar, prints ID
+- **done**: Removes state file, optionally runs `on_click` via `--run`, clears notification
+- **list**: Human-readable table and `--json` output, `--group` filtering
+- **count**: Correct count with and without `--group` filter
+- **clear**: Removes matching alerts, `--group` scoping, prints count of removed
+- **version**: Reads `CFBundleShortVersionString` from bundle
+- **help**: Prints full usage with all subcommands and options
+
+These are tested as end-to-end CLI invocations (`swift run` / `.build/debug/MungMung`), which is the correct level for commands that orchestrate multiple services.
+
+### Future testability
+
+To enable unit testing:
+
+1. **Remove `exit()` from commands** — return an exit code instead and let `main()` call `exit()`:
+   ```swift
+   static func add(...) -> Int32 { /* ... */ return 0 }
+   ```
+
+2. **Inject dependencies** — pass `AlertStore`, `NotificationSending`, and `ShellExecuting` protocols:
+   ```swift
+   static func add(store: AlertStoring, notifications: NotificationSending, ...) -> Int32
+   ```
+
+3. **Capture stdout** — redirect `print()` output to verify CLI output in tests.
+
+This refactoring is deferred — the commands are simple orchestration glue and are well-covered by manual CLI testing.

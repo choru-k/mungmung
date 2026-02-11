@@ -246,3 +246,38 @@ The two modes (CLI and notification click) share the same services:
 - `ShellHelper` for shell command execution and sketchybar triggers
 
 This keeps the codebase simple — the same removal logic in `mung done` and the notification click handler.
+
+## Test Plan
+
+### Why unit tests aren't practical
+
+The notification click handler is an `AppDelegate` method (`userNotificationCenter(_:didReceive:withCompletionHandler:)`) that:
+
+1. **Requires macOS to deliver a `UNNotificationResponse`** — this object cannot be constructed in user code; it is created internally by `UserNotifications` when the system delivers a click event.
+2. **Requires app relaunch by macOS** — the click flow depends on macOS relaunching the app after it has exited, which only happens when the app has a valid bundle and registered notification delegate.
+3. **Calls `exit(0)`** — the handler terminates the process after handling the click, which would kill the test runner.
+
+The `handledNotification` flag and the RunLoop-based timeout in `main()` are tightly coupled to the macOS app lifecycle and cannot be exercised in a test harness.
+
+### What manual/integration verification covers
+
+The Verification section above tests the full click lifecycle:
+- **Click → on_click execution**: Create alert with `--on-click`, click the notification, verify the command ran (file written to `/tmp`)
+- **Click → state cleanup**: After clicking, `mung count` returns 0 (state file removed)
+- **Dismiss (swipe away)**: Dismissing a banner does not trigger the handler — state file persists, verified with `mung count`
+- **No-args launch**: Running `mung` with no arguments shows help after a ~2s timeout (RunLoop finds no pending notification response)
+- **Missing userInfo edge case**: Implicitly tested — any notification without `alert_id` exits cleanly
+
+### Future testability
+
+To enable testing of the click handler logic (not the macOS delivery mechanism):
+
+1. **Extract handler logic into a testable function**:
+   ```swift
+   static func handleNotificationClick(alertID: String, onClick: String?, store: AlertStoring, notifications: NotificationSending)
+   ```
+   The `didReceive` delegate would extract `userInfo` and delegate to this function.
+
+2. **Test the extracted function** with mock `AlertStoring` and `NotificationSending` — no macOS notification system needed.
+
+This is deferred since the handler is straightforward extraction-and-dispatch code, fully verified by the manual click test.

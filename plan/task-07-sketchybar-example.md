@@ -245,3 +245,37 @@ This decoupled design means:
 **Reference patterns from existing dotfiles:**
 - `sketchybar/plugins/ai_sessions.sh` — reads JSON files from status directories, counts active sessions, updates labels with colors. The mungmung plugin follows the same pattern but is simpler (just count files).
 - `sketchybar/sketchybarrc` — shows how to register custom events (`--add event`), create items (`--add item`), and subscribe to events (`--subscribe`).
+
+## Test Plan
+
+### Why unit tests aren't practical
+
+This task has two components, neither of which is unit-testable in Swift:
+
+1. **`ShellHelper`** — a static enum with fire-and-forget `Process` calls. Both methods (`triggerSketchybar` and `execute`) spawn real system processes, discard all output (`FileHandle.nullDevice`), and return no result. There is nothing to assert on — no return value, no observable state change, no thrown error.
+
+2. **`examples/sketchybar-plugin.sh`** — a bash script that reads alert files and calls `sketchybar --set`. This is outside the Swift test target entirely.
+
+### What manual/integration verification covers
+
+The Verification section above covers both components:
+- **Sketchybar trigger**: Register the custom event, run `mung add`, observe that the sketchybar plugin fires
+- **on_click execution**: Create alert with `--on-click`, run `mung done --run`, verify the command executed (file written to `/tmp`)
+- **Plugin directly**: Run the plugin script with `NAME` and `MUNG_DIR` env vars, verify it calls `sketchybar --set`
+- **Sketchybar not running**: Trigger fires silently without error (fire-and-forget design)
+
+### Future testability
+
+`ShellHelper` could be made testable by:
+
+1. **Protocol extraction**:
+   ```swift
+   protocol ShellExecuting {
+       func execute(command: String)
+       func triggerSketchybar()
+   }
+   ```
+
+2. **Capture instead of discard** — a test double could record which commands were requested without spawning processes.
+
+This is low-value since `ShellHelper` is 20 lines of straightforward `Process` boilerplate. The bash plugin is best tested by running it in a shell environment with mock state files.

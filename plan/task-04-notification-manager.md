@@ -215,3 +215,39 @@ The NotificationManager is used by three components:
 - `trigger: nil` means deliver immediately (no scheduling)
 - We use semaphores to make async UNUserNotificationCenter calls synchronous (the CLI is a synchronous tool)
 - Permission is requested once; macOS remembers the user's choice
+
+## Test Plan
+
+### Why unit tests aren't practical
+
+`NotificationManager` is a thin wrapper around `UNUserNotificationCenter`, which is a system framework singleton that:
+- Requires a running app with a valid bundle identifier to function
+- Pops real macOS permission dialogs (`requestAuthorization`)
+- Delivers real notifications to Notification Center
+- Cannot be instantiated or mocked without protocol extraction
+
+Every method (`requestPermission`, `send`, `remove`) calls `UNUserNotificationCenter.current()` directly. There is no seam for injecting a test double.
+
+### What manual/integration verification covers
+
+The Verification section above covers the full surface:
+- **Permission flow**: First-run dialog appears, subsequent calls return immediately
+- **Send**: Notification banner appears with correct title, body, and sound
+- **userInfo roundtrip**: `alert_id` and `on_click` are carried through to the click handler (verified end-to-end in Task 6)
+- **Remove**: Notification disappears from Notification Center after `remove(alertID:)`
+- **Error resilience**: Errors are logged to stderr, not thrown — the CLI doesn't crash on notification failures
+
+### Future testability
+
+To enable unit testing, `NotificationManager` could be refactored behind a protocol:
+
+```swift
+protocol NotificationSending {
+    @discardableResult func requestPermission() -> Bool
+    func send(alert: Alert)
+    func remove(alertID: String)
+    func remove(alertIDs: [String])
+}
+```
+
+`Commands` would depend on `NotificationSending` instead of the concrete class, allowing a `MockNotificationManager` in tests. This refactoring is not warranted now — the class is stable and fully verified manually.

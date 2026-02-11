@@ -590,3 +590,37 @@ xcrun notarytool store-credentials MungMungNotarization \
 ```
 
 **Homebrew cask `binary` stanza:** This is the key — it creates a symlink from `/usr/local/bin/mung` to `MungMung.app/Contents/MacOS/MungMung`, giving users the `mung` CLI command after `brew install`.
+
+## Test Plan
+
+### Why unit tests aren't practical
+
+This task produces shell scripts (`distribute.sh`, `create_dmg.sh`, `create_app_bundle.sh`) and a Homebrew cask formula (`mungmung.rb`). None of these are Swift code — they cannot be exercised by `swift test`.
+
+The pipeline also depends on external tools and credentials:
+- `codesign` with a Developer ID certificate in the keychain
+- `xcrun notarytool` with stored Apple ID credentials
+- `hdiutil` for DMG creation (macOS-only)
+- `gh` CLI authenticated with GitHub
+- A Homebrew tap repository at a known path
+
+These are inherently environment-specific and cannot be reproduced in CI without significant infrastructure.
+
+### What manual/integration verification covers
+
+The Verification section above walks through each stage of the pipeline:
+- **App bundle creation**: `create_app_bundle.sh` produces correct directory structure (`Contents/MacOS/`, `Contents/Info.plist`, `Contents/PkgInfo`)
+- **App bundle runs**: The bundled binary executes correctly (`MungMung.app/Contents/MacOS/MungMung help`)
+- **Code signing**: `codesign --verify` confirms valid signature
+- **DMG creation**: `create_dmg.sh` produces a mountable DMG with the app and Applications symlink
+- **Full pipeline**: `make release VERSION=x.y.z` runs end-to-end (can be dry-run by commenting out notarization)
+- **Cask formula syntax**: `brew style` validates the Ruby formula
+
+### Future testability
+
+Individual stages could be tested in isolation:
+- **`create_app_bundle.sh`**: Assert directory structure and file presence (a shell-based test with a dummy binary)
+- **`mungmung.rb`**: `brew audit --cask` validates formula correctness against Homebrew's rules
+- **Checksum generation**: Verify `shasum -a 256` output format
+
+A CI pipeline could run the unsigned stages (bundle creation, DMG creation) without Developer ID credentials. Signing and notarization would remain manual or require a dedicated macOS CI runner with keychain access.
