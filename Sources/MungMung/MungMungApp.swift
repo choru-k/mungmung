@@ -6,17 +6,24 @@ import UserNotifications
 
 @main
 enum MungMungEntry {
+    /// Determines whether the given arguments indicate CLI mode.
+    /// Returns `true` for known subcommands (plain words) and CLI flags (--help, -h).
+    /// Returns `false` for empty args or macOS launch-service flags (-NSxxx, -Apple).
+    static func isCLIMode(_ args: [String]) -> Bool {
+        guard let first = args.first else { return false }
+        return !first.hasPrefix("-") || first == "--help" || first == "-h"
+    }
+
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
 
-        if !args.isEmpty {
-            // CLI mode — parse, route, exit
+        if isCLIMode(args) {
             let invocation = CLIParser.parse(args)
             CLIParser.route(invocation)
             // CLIParser.route calls exit() internally
         }
 
-        // No args — launch menu bar app
+        // No CLI subcommand — launch menu bar app
         MungMungApp.main()
     }
 }
