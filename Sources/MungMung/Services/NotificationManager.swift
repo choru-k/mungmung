@@ -11,11 +11,23 @@ import UserNotifications
 final class NotificationManager: NotificationSending {
 
     private var center: UNUserNotificationCenter? = {
-        // UNUserNotificationCenter.current() crashes if the process has no valid bundle
-        // (e.g. when running from .build/debug/). Guard against this.
-        guard Bundle.main.bundleIdentifier != nil else { return nil }
+        if Bundle.main.bundleIdentifier != nil {
+            return UNUserNotificationCenter.current()
+        }
+        // When launched via symlink (e.g. /opt/homebrew/bin/mung),
+        // Bundle.main doesn't resolve to the .app bundle.
+        // Resolve the real executable path to check if we're inside one.
+        let resolvedPath = URL(
+            fileURLWithPath: ProcessInfo.processInfo.arguments[0]
+        ).resolvingSymlinksInPath().path
+        guard NotificationManager.isBundledExecutable(resolvedPath: resolvedPath) else { return nil }
         return UNUserNotificationCenter.current()
     }()
+
+    /// Returns `true` when the resolved executable path is inside a `.app` bundle.
+    static func isBundledExecutable(resolvedPath: String) -> Bool {
+        resolvedPath.contains(".app/Contents/MacOS/")
+    }
 
     // MARK: - Permission
 
