@@ -1,43 +1,39 @@
 import AppKit
+import SwiftUI
 import UserNotifications
 
+// MARK: - Entry Point
+
 @main
-struct MungMungApp {
+enum MungMungEntry {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
 
-        if args.isEmpty {
-            // No CLI args — this could be:
-            // 1. User ran `mung` with no args → show help
-            // 2. macOS relaunched the app after a notification click → handle click
-            //
-            // We set up NSApplication and UNUserNotificationCenter only in this path,
-            // because UNUserNotificationCenter requires a valid app bundle (crashes
-            // otherwise when the binary is run from .build/debug/).
-            let app = NSApplication.shared
-            let delegate = AppDelegate()
-            app.delegate = delegate
-
-            // Set notification delegate BEFORE the run loop processes any pending notifications
-            UNUserNotificationCenter.current().delegate = delegate
-
-            app.finishLaunching()
-
-            let deadline = Date().addingTimeInterval(2.0)
-            while Date() < deadline && !delegate.handledNotification {
-                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
-            }
-
-            if !delegate.handledNotification {
-                _ = Commands.help()
-            }
-            exit(0)
+        if !args.isEmpty {
+            // CLI mode — parse, route, exit
+            let invocation = CLIParser.parse(args)
+            CLIParser.route(invocation)
+            // CLIParser.route calls exit() internally
         }
 
-        // Normal CLI invocation — parse and route
-        let invocation = CLIParser.parse(args)
-        CLIParser.route(invocation)
-        exit(0)
+        // No args — launch menu bar app
+        MungMungApp.main()
+    }
+}
+
+// MARK: - SwiftUI App
+
+struct MungMungApp: App {
+    @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
+    @State private var viewModel = AlertViewModel()
+
+    var body: some Scene {
+        MenuBarExtra {
+            MenuBarContentView(viewModel: viewModel)
+        } label: {
+            MenuBarLabel(count: viewModel.alerts.count)
+        }
+        .menuBarExtraStyle(.window)
     }
 }
 
@@ -45,12 +41,8 @@ struct MungMungApp {
 
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
 
-    /// Set to true when a notification click is handled.
-    /// Used by main() to distinguish between "no args" and "notification relaunch".
-    var handledNotification = false
-
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Notification delegate is already set in main()
+        UNUserNotificationCenter.current().delegate = self
     }
 
     /// Called when the user clicks a notification.
@@ -59,8 +51,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        handledNotification = true
-
         let userInfo = response.notification.request.content.userInfo
 
         guard let alertID = userInfo["alert_id"] as? String else {
@@ -86,8 +76,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         // Trigger sketchybar update
         ShellHelper.triggerSketchybar()
 
+        // Notify the view model to refresh
+        NotificationCenter.default.post(name: .alertsDidChange, object: nil)
+
         completionHandler()
-        exit(0)
     }
 
     /// Show notification banner even when the app is in the foreground.

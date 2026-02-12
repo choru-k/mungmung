@@ -18,7 +18,7 @@ import Foundation
 ///   "created_at": "2026-02-09T12:00:00Z"
 /// }
 /// ```
-struct Alert: Codable, Identifiable {
+struct Alert: Codable, Identifiable, Hashable {
     let id: String
     let title: String
     let message: String

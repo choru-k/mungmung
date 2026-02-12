@@ -152,6 +152,24 @@ final class AlertTests: XCTestCase {
         XCTAssertEqual(alert.age, "3d")
     }
 
+    // MARK: - Hashable
+
+    func testHashable_sameAlertHashesEqual() {
+        let alert = Alert(title: "T", message: "M")
+        XCTAssertEqual(alert.hashValue, alert.hashValue)
+    }
+
+    func testHashable_conformance() {
+        let a1 = Alert(title: "A", message: "1")
+        let a2 = Alert(title: "B", message: "2")
+        var set = Set<Alert>()
+        set.insert(a1)
+        set.insert(a2)
+        set.insert(a1) // duplicate
+
+        XCTAssertEqual(set.count, 2)
+    }
+
     // MARK: - Helpers
 
     private func makeAlert(secondsAgo: TimeInterval) -> Alert {
