@@ -77,6 +77,40 @@ MungMung/
 | 6 | [Notification Click Handler](task-06-notification-click-handler.md) | Tasks 2, 4, 7 | MungMungApp.swift (update) |
 | 7 | [Shell Helper & Sketchybar Integration](task-07-sketchybar-example.md) | Task 1 | ShellHelper.swift, examples/sketchybar-plugin.sh |
 | 8 | [Build & Distribution](task-08-build-distribution.md) | Tasks 1-7 | Scripts/distribute.sh, Scripts/create_dmg.sh, Casks/mungmung.rb |
+| 9 | [Protocols & DI Refactor](task-09-protocols-di-refactor.md) | Tasks 4, 5, 7 | Protocols.swift, NotificationManager.swift, ShellHelper.swift, Commands.swift |
+| 10 | [Update Call Sites](task-10-update-call-sites.md) | Task 9 | CLIParser.swift, MungMungApp.swift, Makefile |
+| 11 | [Test Mocks](task-11-test-mocks.md) | Task 9 | Mocks.swift |
+| 12 | [Commands Unit Tests](task-12-commands-unit-tests.md) | Tasks 10, 11 | CommandsTests.swift |
+| 13 | [CLI Integration Tests](task-13-cli-integration-tests.md) | Task 10 | CLIIntegrationTests.swift |
+
+## Testing Plan (Tasks 9-13)
+
+### Phase 1: Refactor for Testability (Tasks 9-10)
+- **Task 9:** Create protocols + conform types + refactor Commands to return exit codes with DI
+- **Task 10:** Update CLIParser and MungMungApp call sites + Makefile
+
+### Phase 2: Test Infrastructure (Task 11)
+- **Task 11:** Create mock implementations for testing
+
+### Phase 3: Write Tests (Tasks 12-13)
+- **Task 12:** ~25 Commands unit tests
+- **Task 13:** ~22 CLI integration tests
+
+### Execution Plan
+
+**Batch 1:** Task 9
+**Checkpoint:** `swift build` compiles clean
+
+**Batch 2:** Tasks 10, 11 (independent)
+**Checkpoint:** `swift build && swift test` — all 45 existing tests pass
+
+**Batch 3:** Tasks 12, 13 (independent)
+**Checkpoint:** `swift build && swift test` — ~92 total tests pass
+
+### Final Verification
+- [ ] All ~92 tests pass
+- [ ] No behavioral regressions: `mung help`, `mung version`, add/list/clear cycle works
+- [ ] Existing 45 tests unaffected
 
 ## Dependency Graph
 
@@ -93,11 +127,18 @@ Task 1 (Project Setup)
            ├── Task 5 (Commands) ──────┐
            │                           ├── Task 8 (Build & Distribution)
            └── Task 6 (Click Handler) ─┘
+
+Task 5 (Commands) + Task 4 + Task 7
+  └── Task 9 (Protocols & DI Refactor)
+        ├── Task 10 (Update Call Sites) ──┐
+        │                                 ├── Task 12 (Commands Unit Tests)
+        └── Task 11 (Test Mocks) ─────────┘
+        └── Task 10 ──── Task 13 (CLI Integration Tests)
 ```
 
-**Parallelizable after Task 1:** Tasks 2, 3, 4, 7 can all be built independently.
-**Then:** Tasks 5 and 6 wire everything together.
-**Finally:** Task 8 packages it all up.
+**Tasks 1-8:** Core implementation (complete).
+**Tasks 9-10:** Refactor for testability.
+**Tasks 11-13:** Test infrastructure and test suites.
 
 ## Key Decisions
 

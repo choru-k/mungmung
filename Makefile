@@ -23,6 +23,11 @@ run: build-debug
 	@echo "Running MungMung..."
 	.build/debug/MungMung $(ARGS)
 
+## Run tests
+test:
+	@echo "Running tests..."
+	swift build && swift test
+
 ## Build release app, create DMG, and upload to GitHub Release
 ## Usage: make release VERSION=0.1.0
 release:
@@ -33,9 +38,12 @@ ifndef VERSION
 endif
 	@echo "Building release v$(VERSION)..."
 	swift build -c release
-	@echo "Creating app bundle..."
-	chmod +x Scripts/distribute.sh Scripts/create_dmg.sh
+	@echo "Creating distribution..."
+	chmod +x Scripts/distribute.sh Scripts/create_dmg.sh Scripts/create_app_bundle.sh
 	Scripts/distribute.sh .build/release/MungMung $(VERSION)
+	@echo ""
+	@echo "Release artifacts created in dist/"
+	@ls -la dist/
 
 # =============================================================================
 # Install
@@ -76,6 +84,7 @@ help:
 	@echo "  make build             - Build release binary"
 	@echo "  make build-debug       - Build debug binary"
 	@echo "  make run ARGS='help'   - Build and run with arguments"
+	@echo "  make test              - Run unit tests"
 	@echo "  make release VERSION=x.y.z - Build, sign, notarize, release"
 	@echo ""
 	@echo "Install:"

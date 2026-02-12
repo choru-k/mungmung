@@ -45,6 +45,12 @@ final class AlertStore {
         }
     }
 
+    /// Create a store rooted at the given directory.
+    /// Useful for testing with a temporary directory.
+    init(baseDir: URL) {
+        self.baseDir = baseDir
+    }
+
     // MARK: - Directory Management
 
     /// Ensure the alerts directory exists. Creates it (and parents) if needed.

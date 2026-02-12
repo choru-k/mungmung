@@ -19,6 +19,11 @@ let package = Package(
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
+        ),
+        .testTarget(
+            name: "MungMungTests",
+            dependencies: ["MungMung"],
+            path: "Tests/MungMungTests"
         )
     ]
 )

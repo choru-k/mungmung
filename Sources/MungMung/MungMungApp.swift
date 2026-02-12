@@ -1,29 +1,42 @@
 import AppKit
 import UserNotifications
 
-// MARK: - App Entry Point
-
 @main
 struct MungMungApp {
     static func main() {
-        let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
-
-        // Check if launched from notification click
-        // (expanded in Task 6)
-
-        // Parse CLI arguments and dispatch
-        // (expanded in Task 5)
         let args = Array(CommandLine.arguments.dropFirst())
 
         if args.isEmpty {
-            Commands.help()
+            // No CLI args — this could be:
+            // 1. User ran `mung` with no args → show help
+            // 2. macOS relaunched the app after a notification click → handle click
+            //
+            // We set up NSApplication and UNUserNotificationCenter only in this path,
+            // because UNUserNotificationCenter requires a valid app bundle (crashes
+            // otherwise when the binary is run from .build/debug/).
+            let app = NSApplication.shared
+            let delegate = AppDelegate()
+            app.delegate = delegate
+
+            // Set notification delegate BEFORE the run loop processes any pending notifications
+            UNUserNotificationCenter.current().delegate = delegate
+
+            app.finishLaunching()
+
+            let deadline = Date().addingTimeInterval(2.0)
+            while Date() < deadline && !delegate.handledNotification {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+            }
+
+            if !delegate.handledNotification {
+                _ = Commands.help()
+            }
             exit(0)
         }
 
-        // Placeholder — will be replaced by CLIParser.route() in Task 5
-        print("mungmung: not yet implemented")
+        // Normal CLI invocation — parse and route
+        let invocation = CLIParser.parse(args)
+        CLIParser.route(invocation)
         exit(0)
     }
 }
@@ -31,44 +44,58 @@ struct MungMungApp {
 // MARK: - AppDelegate
 
 class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+
+    /// Set to true when a notification click is handled.
+    /// Used by main() to distinguish between "no args" and "notification relaunch".
+    var handledNotification = false
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UNUserNotificationCenter.current().delegate = self
+        // Notification delegate is already set in main()
     }
 
-    // Notification click handler (expanded in Task 6)
+    /// Called when the user clicks a notification.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        // Placeholder — expanded in Task 6
+        handledNotification = true
+
+        let userInfo = response.notification.request.content.userInfo
+
+        guard let alertID = userInfo["alert_id"] as? String else {
+            completionHandler()
+            return
+        }
+
+        // Execute on_click command if user clicked the notification body
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+            if let onClick = userInfo["on_click"] as? String, !onClick.isEmpty {
+                ShellHelper.execute(command: onClick)
+            }
+        }
+
+        // Remove state file
+        let store = AlertStore()
+        store.remove(id: alertID)
+
+        // Remove notification from Notification Center
+        let nm = NotificationManager()
+        nm.remove(alertID: alertID)
+
+        // Trigger sketchybar update
+        ShellHelper.triggerSketchybar()
+
         completionHandler()
+        exit(0)
     }
 
-    // Show notification even when app is in foreground
+    /// Show notification banner even when the app is in the foreground.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
-    }
-}
-
-// Placeholder namespace for commands — replaced in Task 5
-enum Commands {
-    static func help() {
-        print("""
-        Usage: mung <command> [options]
-
-        Commands:
-          add      Create alert and send notification
-          done     Dismiss alert by ID
-          list     List pending alerts
-          count    Print alert count
-          clear    Dismiss all alerts
-          version  Print version
-          help     Show this help
-        """)
     }
 }

@@ -237,3 +237,26 @@ mung clear   [--group "name"]
 mung version
 mung help
 ```
+
+## Test Plan
+
+### `Tests/MungMungTests/CLIParserTests.swift` (14 tests)
+
+Tests `CLIParser.parse()` only. `route()` calls `exit()` and side-effects into `Commands`, so it is not unit-testable.
+
+| Test | What it verifies |
+|------|-----------------|
+| `testEmptyArgs_returnsHelpSubcommand` | `[]` → subcommand `"help"`, everything else empty |
+| `testSingleSubcommand` | `["version"]` → subcommand `"version"`, no flags/args |
+| `testSubcommandIsLowercased` | `["ADD"]` → `"add"` |
+| `testSubcommandMixedCase` | `["LiSt"]` → `"list"` |
+| `testValuedFlags_titleAndMessage` | `--title` and `--message` extracted into `flags` dict |
+| `testAllSixValuedFlags` | All 6 valued flags (`--title`, `--message`, `--on-click`, `--icon`, `--group`, `--sound`) |
+| `testBooleanFlag_json` | `--json` lands in `boolFlags`, not `flags` |
+| `testUnknownFlagTreatedAsBoolean` | `--verbose` (not in valuedFlags) → boolean flag |
+| `testPositionalArg` | `["done", "123_abc"]` → positionalArgs `["123_abc"]` |
+| `testMultiplePositionalArgs` | `["done", "id1", "id2"]` → positionalArgs `["id1", "id2"]` |
+| `testMixed_positionalAndBoolFlag` | `["done", "123_abc", "--run"]` → positional + bool flag |
+| `testMixed_valuedFlagAndBoolFlag` | `["list", "--json", "--group", "ci"]` → bool + valued flag |
+| `testValuedFlagWithoutValue_atEndOfArgs` | `["add", "--title"]` → `--title` treated as bool flag |
+| `testValuedFlagValueContainingSpaces` | `--title "Hello World"` → value preserved with spaces |

@@ -288,3 +288,62 @@ State directory structure:
     ├── 1738000060_b2c3d4e5.json
     └── ...
 ```
+
+## Test Plan
+
+### Production code change for testability
+
+`AlertStore` gains an `init(baseDir: URL)` so tests can inject a temp directory instead of relying on `$MUNG_DIR`:
+
+```swift
+init(baseDir: URL) {
+    self.baseDir = baseDir
+}
+```
+
+### `Tests/MungMungTests/AlertTests.swift` (13 tests)
+
+| Test | What it verifies |
+|------|-----------------|
+| `testGenerateID_format` | ID matches `^\d+_[0-9a-f]{8}$` |
+| `testGenerateID_uniqueness` | 100 generated IDs are all unique |
+| `testConvenienceInit_setsIdAndCreatedAt` | Init auto-generates id and sets createdAt to now |
+| `testConvenienceInit_optionalFieldsDefaultToNil` | onClick, icon, group, sound default to nil |
+| `testConvenienceInit_setsOptionalFields` | All optional fields are set when provided |
+| `testCodableRoundTrip_allFields` | Encode → decode preserves all fields |
+| `testCodableRoundTrip_minimalFields` | Encode → decode with only required fields |
+| `testJSONKeyMapping` | JSON uses `on_click`/`created_at` (not camelCase) |
+| `testDecodeFromExternalJSON` | Decode from hand-written JSON matching SPEC format |
+| `testAge_seconds` | 30s ago → `"30s"` |
+| `testAge_minutes` | 120s ago → `"2m"` |
+| `testAge_hours` | 3600s ago → `"1h"` |
+| `testAge_days` | 3d ago → `"3d"` |
+
+**Helper**: `makeAlert(secondsAgo:)` decodes from JSON with a controlled `created_at` to test the `age` property without modifying the model.
+
+### `Tests/MungMungTests/AlertStoreTests.swift` (18 tests)
+
+Each test gets a unique UUID-based temp directory, cleaned up in `tearDown`.
+
+| Test | What it verifies |
+|------|-----------------|
+| `testSaveAndLoad_roundTrip` | Save then load returns matching alert |
+| `testSave_createsFileOnDisk` | File exists at `alertsDir/<id>.json` after save |
+| `testSave_createsDirectoryIfNeeded` | `alertsDir` is auto-created on first save |
+| `testLoad_nonexistentID_returnsNil` | Loading unknown ID returns nil |
+| `testRemove_returnsRemovedAlert` | Remove returns the alert that was removed |
+| `testRemove_deletesFileFromDisk` | File is gone after remove |
+| `testRemove_nonexistentID_returnsNil` | Removing unknown ID returns nil |
+| `testRemove_alertNoLongerLoadable` | Load returns nil after remove |
+| `testList_empty` | List on empty store returns `[]` |
+| `testList_returnsSortedByCreationTime` | Alerts saved out-of-order are listed chronologically |
+| `testList_filteredByGroup` | Group filter returns only matching alerts |
+| `testCount_empty` | Count on empty store returns 0 |
+| `testCount_afterSaves` | Count reflects number of saved alerts |
+| `testCount_filteredByGroup` | Count with group filter |
+| `testClear_removesAllAlerts` | Clear drops count to 0 |
+| `testClear_returnsRemovedAlerts` | Clear returns the removed alerts |
+| `testClear_byGroup_onlyRemovesMatching` | Group-scoped clear leaves other groups intact |
+| `testClear_byGroup_nonexistentGroup_removesNothing` | Clear with unknown group is a no-op |
+
+**Helper**: `makeAlert(title:createdAt:)` decodes from JSON with a controlled timestamp to test sort order.

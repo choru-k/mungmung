@@ -337,3 +337,43 @@ mungmung/
 ```
 
 The app is a headless macOS executable (no GUI, no Dock icon). It processes CLI arguments, does its work (send notification, write/read state files, execute shell commands), and exits. When macOS relaunches it after a notification click, the AppDelegate handles the click and exits.
+
+## Test Plan
+
+Test infrastructure is set up as part of this task's scope.
+
+### Test Target (`Package.swift`)
+
+```swift
+.testTarget(
+    name: "MungMungTests",
+    dependencies: ["MungMung"],
+    path: "Tests/MungMungTests"
+)
+```
+
+Swift 5.4+ supports `@testable import` of executable targets — no library extraction needed.
+
+### Test Directory
+
+```
+Tests/MungMungTests/
+├── CLIParserTests.swift    (Task 3)
+├── AlertTests.swift        (Task 2)
+└── AlertStoreTests.swift   (Task 2)
+```
+
+### Makefile
+
+```makefile
+test:
+	@echo "Running tests..."
+	swift test
+```
+
+### Running Tests
+
+```bash
+swift test          # run all tests
+make test           # same, via Makefile
+```
