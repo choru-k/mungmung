@@ -32,7 +32,14 @@ enum MungMungEntry {
 
 struct MungMungApp: App {
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
-    @State private var viewModel = AlertViewModel()
+    @State private var settings: AppSettings
+    @State private var viewModel: AlertViewModel
+
+    init() {
+        let s = AppSettings()
+        _settings = State(initialValue: s)
+        _viewModel = State(initialValue: AlertViewModel(settings: s))
+    }
 
     var body: some Scene {
         MenuBarExtra {
@@ -41,6 +48,10 @@ struct MungMungApp: App {
             MenuBarLabel(count: viewModel.alerts.count)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView(settings: settings)
+        }
     }
 }
 
@@ -95,6 +106,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound])
+        let soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
+        completionHandler(soundEnabled ? [.banner, .sound] : [.banner])
     }
 }

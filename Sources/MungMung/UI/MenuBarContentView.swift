@@ -9,9 +9,9 @@ struct MenuBarContentView: View {
                 emptyState
             } else {
                 alertList
-                Divider()
-                footer
             }
+            Divider()
+            footer
         }
         .frame(width: 320)
         .onAppear {
@@ -38,9 +38,13 @@ struct MenuBarContentView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(viewModel.alerts) { alert in
-                    AlertRowView(alert: alert) {
-                        viewModel.dismiss(alert)
-                    }
+                    AlertRowView(
+                        alert: alert,
+                        onDismiss: { viewModel.dismiss(alert) },
+                        onRun: (alert.onClick != nil && !(alert.onClick?.isEmpty ?? true))
+                            ? { viewModel.run(alert) }
+                            : nil
+                    )
                     .padding(.horizontal, 12)
                     Divider()
                 }
@@ -51,16 +55,32 @@ struct MenuBarContentView: View {
 
     private var footer: some View {
         HStack {
-            Text("\(viewModel.alerts.count) alert\(viewModel.alerts.count == 1 ? "" : "s")")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button("Clear All") {
-                viewModel.clearAll()
+            SettingsLink {
+                Image(systemName: "gear")
             }
             .buttonStyle(.plain)
-            .font(.caption)
-            .foregroundStyle(.red)
+
+            Button {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            if !viewModel.alerts.isEmpty {
+                Text("\(viewModel.alerts.count) alert\(viewModel.alerts.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button("Clear All") {
+                    viewModel.clearAll()
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(.red)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

@@ -3,6 +3,7 @@ import SwiftUI
 struct AlertRowView: View {
     let alert: Alert
     let onDismiss: () -> Void
+    var onRun: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -26,6 +27,14 @@ struct AlertRowView: View {
             Text(alert.age)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+
+            if let onRun {
+                Button(action: onRun) {
+                    Image(systemName: "play.circle.fill")
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+            }
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark.circle.fill")

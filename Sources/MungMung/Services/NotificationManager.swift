@@ -73,8 +73,9 @@ final class NotificationManager: NotificationSending {
         content.title = alert.title
         content.body = alert.message
 
-        // Sound
-        if let sound = alert.sound {
+        // Sound (respect global setting)
+        let soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true
+        if soundEnabled, let sound = alert.sound {
             if sound == "default" {
                 content.sound = .default
             } else {

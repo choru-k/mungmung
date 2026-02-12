@@ -9,6 +9,8 @@ final class AlertViewModelTests: XCTestCase {
     var store: AlertStore!
     var mockNotifications: MockNotificationManager!
     var mockShell: MockShellRunner!
+    var settingsSuiteName: String!
+    var settings: AppSettings!
     var vm: AlertViewModel!
 
     override func setUp() {
@@ -18,16 +20,20 @@ final class AlertViewModelTests: XCTestCase {
         store = AlertStore(baseDir: tempDir)
         mockNotifications = MockNotificationManager()
         mockShell = MockShellRunner()
+        settingsSuiteName = "mung-test-settings-\(UUID().uuidString)"
+        settings = AppSettings(defaults: UserDefaults(suiteName: settingsSuiteName)!)
         vm = AlertViewModel(
             store: store,
             notifications: mockNotifications,
-            shell: mockShell
+            shell: mockShell,
+            settings: settings
         )
     }
 
     override func tearDown() {
         vm.stopPolling()
         try? FileManager.default.removeItem(at: tempDir)
+        UserDefaults.standard.removePersistentDomain(forName: settingsSuiteName)
         super.tearDown()
     }
 
@@ -155,6 +161,80 @@ final class AlertViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.alerts.count, 1)
         XCTAssertEqual(vm.alerts.first?.title, "New")
+    }
+
+    // MARK: - run
+
+    func testRun_executesOnClick() throws {
+        let alert = Alert(title: "T", message: "M", onClick: "echo hello")
+        try store.save(alert)
+        vm.startPolling()
+
+        vm.run(alert)
+
+        XCTAssertEqual(mockShell.executedCommands, ["echo hello"])
+    }
+
+    func testRun_removesFromStore() throws {
+        let alert = Alert(title: "T", message: "M", onClick: "echo hello")
+        try store.save(alert)
+        vm.startPolling()
+
+        vm.run(alert)
+
+        XCTAssertNil(store.load(id: alert.id))
+    }
+
+    func testRun_removesNotification() throws {
+        let alert = Alert(title: "T", message: "M", onClick: "echo hello")
+        try store.save(alert)
+        vm.startPolling()
+
+        vm.run(alert)
+
+        XCTAssertEqual(mockNotifications.removedAlertIDs, [alert.id])
+    }
+
+    func testRun_triggersSketchybar() throws {
+        let alert = Alert(title: "T", message: "M", onClick: "echo hello")
+        try store.save(alert)
+        vm.startPolling()
+
+        vm.run(alert)
+
+        XCTAssertEqual(mockShell.triggerSketchybarCount, 1)
+    }
+
+    func testRun_refreshesAlerts() throws {
+        let alert = Alert(title: "T", message: "M", onClick: "echo hello")
+        try store.save(alert)
+        vm.startPolling()
+        XCTAssertEqual(vm.alerts.count, 1)
+
+        vm.run(alert)
+
+        XCTAssertEqual(vm.alerts.count, 0)
+    }
+
+    func testRun_noOnClick_doesNotExecuteCommand() throws {
+        let alert = Alert(title: "T", message: "M")
+        try store.save(alert)
+        vm.startPolling()
+
+        vm.run(alert)
+
+        XCTAssertEqual(mockShell.executedCommands, [])
+    }
+
+    func testRun_noOnClick_stillRemovesAlert() throws {
+        let alert = Alert(title: "T", message: "M")
+        try store.save(alert)
+        vm.startPolling()
+
+        vm.run(alert)
+
+        XCTAssertNil(store.load(id: alert.id))
+        XCTAssertEqual(vm.alerts.count, 0)
     }
 
     // MARK: - stopPolling
