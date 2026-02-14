@@ -54,35 +54,50 @@ struct MenuBarContentView: View {
     }
 
     private var footer: some View {
-        HStack {
-            SettingsLink {
-                Image(systemName: "gear")
+        VStack(spacing: 0) {
+            if !viewModel.alerts.isEmpty {
+                HStack {
+                    Text("\(viewModel.alerts.count) alert\(viewModel.alerts.count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear All") {
+                        viewModel.clearAll()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                Divider()
+            }
+
+            Button {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            } label: {
+                HStack {
+                    Text("Settings...")
+                    Spacer()
+                }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
 
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
-                Image(systemName: "power")
+                HStack {
+                    Text("Quit MungMung")
+                    Spacer()
+                }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-
-            Spacer()
-
-            if !viewModel.alerts.isEmpty {
-                Text("\(viewModel.alerts.count) alert\(viewModel.alerts.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button("Clear All") {
-                    viewModel.clearAll()
-                }
-                .buttonStyle(.plain)
-                .font(.caption)
-                .foregroundStyle(.red)
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
     }
 }
