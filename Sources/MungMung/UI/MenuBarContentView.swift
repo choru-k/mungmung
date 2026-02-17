@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @Bindable var viewModel: AlertViewModel
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,7 +75,7 @@ struct MenuBarContentView: View {
             }
 
             Button {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                openSettings()
             } label: {
                 HStack {
                     Text("Settings...")
@@ -82,9 +83,7 @@ struct MenuBarContentView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .buttonStyle(HoverButtonStyle())
 
             Button {
                 NSApplication.shared.terminate(nil)
@@ -95,9 +94,21 @@ struct MenuBarContentView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HoverButtonStyle())
+        }
+    }
+}
+
+private struct HoverButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-        }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isHovered ? Color.primary.opacity(0.1) : Color.clear)
+            .cornerRadius(4)
+            .onHover { isHovered = $0 }
     }
 }
