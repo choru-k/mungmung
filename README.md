@@ -59,6 +59,15 @@ mung done 1738000000_a1b2c3d4 --run
 mung clear --group claude
 ```
 
+## Menu Bar App
+
+When launched as a GUI app (e.g. from `/Applications`), mungmung lives in the macOS menu bar.
+
+- **Menu bar icon** — a bell that shows a badge with the current alert count
+- **Alert popup** — scrollable list of pending alerts, each showing icon, title, message, and age. A **Run** button (play icon) fires the alert's `on-click` command; a dismiss button removes it. **Clear All** at the bottom removes every alert at once.
+- **Settings** — Launch at Login toggle, Polling Interval picker (1s / 2s / 5s / 10s), and Notification Sound toggle
+- **Quit MungMung** — in the popup footer
+
 ## How it works
 
 1. `mung add` writes a JSON state file to `~/.local/share/mung/alerts/` and fires a native macOS notification
