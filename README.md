@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Resources/AppIcon.png" width="128" alt="MungMung app icon">
+</p>
+
 # mungmung
 
 A native macOS app that manages stateful notifications via CLI. Built from scratch with Swift and `UNUserNotificationCenter` — no terminal-notifier dependency.
@@ -64,7 +68,7 @@ mung clear --tag claude
 
 When launched as a GUI app (e.g. from `/Applications`), mungmung lives in the macOS menu bar.
 
-- **Menu bar icon** — a bell that shows a badge with the current alert count
+- **Menu bar icon** — a custom dog silhouette that adapts to light/dark mode, with a red dot badge when alerts are present
 - **Alert popup** — scrollable list of pending alerts, each showing icon, title, message, and age. A **Run** button (play icon) fires the alert's `on-click` command; a dismiss button removes it. **Clear All** at the bottom removes every alert at once.
 - **Settings** — Launch at Login toggle, Polling Interval picker (1s / 2s / 5s / 10s), and Notification Sound toggle
 - **Quit MungMung** — in the popup footer
