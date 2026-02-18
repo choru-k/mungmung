@@ -1,6 +1,6 @@
 # MungMung Makefile
 
-.PHONY: build build-debug test run clean release help
+.PHONY: build build-debug test run clean release icon help
 
 .DEFAULT_GOAL := help
 
@@ -64,6 +64,12 @@ uninstall:
 # Utilities
 # =============================================================================
 
+## Regenerate app icon with squircle mask from source artwork
+icon:
+	@echo "Generating app icon..."
+	swift Scripts/generate_icon.swift
+	@echo "Icon generated. Verify with: open Resources/AppIcon.icns"
+
 ## Resolve package dependencies
 resolve:
 	@echo "Resolving dependencies..."
@@ -92,6 +98,7 @@ help:
 	@echo "  make uninstall         - Remove mung from /usr/local/bin"
 	@echo ""
 	@echo "Utilities:"
+	@echo "  make icon              - Regenerate app icon with squircle mask"
 	@echo "  make resolve           - Resolve dependencies"
 	@echo "  make clean             - Clean all build artifacts"
 	@echo "  make help              - Show this help"
