@@ -25,11 +25,11 @@ A native macOS app that manages stateful notifications via CLI. No wrapper aroun
 Single binary embedded in the app bundle. Symlinked to PATH as `mung`.
 
 ```
-mung add     --title "..." --message "..." [--on-click "cmd"] [--icon "🔔"] [--group "name"] [--sound "default"]
-mung list    [--json] [--group "name"]
+mung add     --title "..." --message "..." [--on-click "cmd"] [--icon "..."] [--tag "name" ...] [--sound "default"]
+mung list    [--json] [--tag "name" ...]
 mung done    <id> [--run]
-mung count   [--group "name"]
-mung clear   [--group "name"]
+mung count   [--tag "name" ...]
+mung clear   [--tag "name" ...]
 mung version
 mung help
 ```
@@ -55,12 +55,12 @@ mung help
 **`mung list [--json]`** — List pending alerts
 - Reads all state files from `$MUNG_DIR/alerts/`
 - `--json`: output as JSON array
-- Default: human-readable table (ID, group, icon, title, age)
+- Default: human-readable table (ID, tags, icon, title, age)
 
 **`mung count`** — Print number of pending alerts
 - For sketchybar consumption
 
-**`mung clear`** — Dismiss all (or by group)
+**`mung clear`** — Dismiss all (or by tag)
 
 ## State
 
@@ -78,7 +78,7 @@ Alerts stored in `$MUNG_DIR/alerts/<id>.json`.
   "message": "Waiting for input",
   "on_click": "aerospace workspace Terminal",
   "icon": "🤖",
-  "group": "claude",
+  "tags": ["claude"],
   "sound": "default",
   "created_at": "2026-02-09T12:00:00Z"
 }
@@ -116,7 +116,7 @@ macOS delivers the click to `UNUserNotificationCenterDelegate.didReceive`:
 ### Notification features (native UNUserNotificationCenter)
 
 - Custom title, subtitle, message
-- Custom icon (app icon shows in notification — can be set per-notification via `UNNotificationContent`)
+- Custom icon — emoji, SF Symbol name (e.g. `"bell.fill"`), or image file path (e.g. `"/path/to/icon.png"`); rendered as notification attachment thumbnail
 - Sound (system sounds or custom)
 - Notification categories with action buttons (future: "Dismiss", "Snooze")
 - Thread identifiers for grouping related notifications
@@ -159,7 +159,7 @@ mung add --title "Build" --message "Deploy ready" --on-click "open https://githu
 
 # Claude Code hook (in settings.json)
 mung add --title "Claude Code" --message "Waiting: ${CLAUDE_PROJECT_DIR##*/}" \
-  --group claude --icon "🤖" --sound default \
+  --tag claude --icon "🤖" --sound default \
   --on-click "aerospace workspace Terminal"
 
 # Check alerts
@@ -173,7 +173,7 @@ mung done 1738000000_a1b2c3d4
 mung done 1738000000_a1b2c3d4 --run
 
 # Clear all claude alerts
-mung clear --group claude
+mung clear --tag claude
 ```
 
 ## What's NOT in scope

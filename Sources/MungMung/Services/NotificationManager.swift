@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import UserNotifications
 
@@ -83,9 +84,21 @@ final class NotificationManager: NotificationSending {
             }
         }
 
-        // Thread identifier for grouping (maps to alert group)
-        if let group = alert.group {
-            content.threadIdentifier = group
+        // Thread identifier for grouping (uses first tag)
+        if let firstTag = alert.tags.first {
+            content.threadIdentifier = firstTag
+        }
+
+        // Icon attachment (renders icon to temp PNG for notification thumbnail)
+        if let icon = alert.icon, !icon.isEmpty,
+           let image = IconRenderer.renderToImage(icon, pointSize: 64),
+           let tempURL = IconRenderer.writeTempPNG(image) {
+            defer { try? FileManager.default.removeItem(at: tempURL) }
+            if let attachment = try? UNNotificationAttachment(
+                identifier: "icon", url: tempURL, options: nil
+            ) {
+                content.attachments = [attachment]
+            }
         }
 
         // userInfo carries alert metadata for click handling

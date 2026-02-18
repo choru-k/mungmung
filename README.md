@@ -22,11 +22,12 @@ The `mung` CLI is symlinked automatically.
 ## Usage
 
 ```
-mung add     --title "..." --message "..." [--on-click "cmd"] [--icon "..."] [--group "name"] [--sound "default"]
-mung list    [--json] [--group "name"]
+mung add     --title "..." --message "..." [--on-click "cmd"] [--icon "..."] [--tag "name" ...] [--sound "default"]
+             # --icon accepts emoji ("🤖"), SF Symbol ("bell.fill"), or image path ("/path/to/icon.png")
+mung list    [--json] [--tag "name" ...]
 mung done    <id> [--run]
-mung count   [--group "name"]
-mung clear   [--group "name"]
+mung count   [--tag "name" ...]
+mung clear   [--tag "name" ...]
 mung version
 mung help
 ```
@@ -37,9 +38,9 @@ mung help
 # Simple notification
 mung add --title "Build" --message "Deploy ready" --on-click "open https://github.com"
 
-# Notification with group and icon
+# Notification with tags and icon
 mung add --title "Claude Code" --message "Waiting for input" \
-  --group claude --icon "🤖" --sound default \
+  --tag claude --icon "🤖" --sound default \
   --on-click "aerospace workspace Terminal"
 
 # List all pending alerts
@@ -55,8 +56,8 @@ mung done 1738000000_a1b2c3d4
 # Dismiss and run its on-click action
 mung done 1738000000_a1b2c3d4 --run
 
-# Clear all alerts in a group
-mung clear --group claude
+# Clear all alerts with a tag
+mung clear --tag claude
 ```
 
 ## Menu Bar App

@@ -7,9 +7,8 @@ struct AlertRowView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if let icon = alert.icon {
-                Text(icon)
-                    .font(.title2)
+            if let icon = alert.icon, !icon.isEmpty {
+                IconView(icon: icon)
             }
 
             VStack(alignment: .leading, spacing: 2) {
