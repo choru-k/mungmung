@@ -93,8 +93,8 @@ final class AlertStore {
     }
 
     /// List all alerts, sorted by creation time (oldest first).
-    /// Optionally filter by group name.
-    func list(group: String? = nil) -> [Alert] {
+    /// Optionally filter by tags (OR match — alert must have at least one of the given tags).
+    func list(tags: [String] = []) -> [Alert] {
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: alertsDir,
             includingPropertiesForKeys: nil
@@ -105,23 +105,23 @@ final class AlertStore {
             guard let data = try? Data(contentsOf: file),
                   let alert = try? decoder.decode(Alert.self, from: data) else { continue }
 
-            if let group = group, alert.group != group { continue }
+            if !tags.isEmpty, Set(tags).isDisjoint(with: Set(alert.tags)) { continue }
             alerts.append(alert)
         }
 
         return alerts.sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// Count alerts. Optionally filter by group.
-    func count(group: String? = nil) -> Int {
-        list(group: group).count
+    /// Count alerts. Optionally filter by tags.
+    func count(tags: [String] = []) -> Int {
+        list(tags: tags).count
     }
 
-    /// Remove all alerts. Optionally filter by group.
+    /// Remove all alerts. Optionally filter by tags.
     /// Returns the removed alerts.
     @discardableResult
-    func clear(group: String? = nil) -> [Alert] {
-        let alerts = list(group: group)
+    func clear(tags: [String] = []) -> [Alert] {
+        let alerts = list(tags: tags)
         for alert in alerts {
             remove(id: alert.id)
         }

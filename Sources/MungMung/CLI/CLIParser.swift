@@ -22,12 +22,18 @@ enum CLIParser {
         let positionalArgs: [String]    // args that aren't flags
         let flags: [String: String]     // --key value pairs
         let boolFlags: Set<String>      // --flag (no value)
+        let arrayFlags: [String: [String]]  // --tag repeated values
     }
 
     /// Known flags that take a value (--key value).
     /// Everything else with `--` prefix is treated as a boolean flag.
     private static let valuedFlags: Set<String> = [
-        "--title", "--message", "--on-click", "--icon", "--group", "--sound"
+        "--title", "--message", "--on-click", "--icon", "--sound"
+    ]
+
+    /// Flags that can be repeated to accumulate an array of values.
+    private static let arrayValuedFlags: Set<String> = [
+        "--tag"
     ]
 
     /// Parse raw arguments into an Invocation.
@@ -37,26 +43,31 @@ enum CLIParser {
     /// Examples:
     /// - `["add", "--title", "Hello", "--message", "World"]`
     /// - `["done", "1738000000_a1b2c3d4", "--run"]`
-    /// - `["list", "--json", "--group", "claude"]`
+    /// - `["list", "--json", "--tag", "ci"]`
     static func parse(_ args: [String]) -> Invocation {
         guard let subcommand = args.first else {
-            return Invocation(subcommand: "help", positionalArgs: [], flags: [:], boolFlags: [])
+            return Invocation(subcommand: "help", positionalArgs: [], flags: [:], boolFlags: [], arrayFlags: [:])
         }
 
         var positionalArgs: [String] = []
         var flags: [String: String] = [:]
         var boolFlags: Set<String> = []
+        var arrayFlags: [String: [String]] = [:]
 
         var i = 1  // skip subcommand
         while i < args.count {
             let arg = args[i]
 
             if arg.hasPrefix("--") {
-                if valuedFlags.contains(arg), i + 1 < args.count {
+                if arrayValuedFlags.contains(arg), i + 1 < args.count {
+                    // Array-valued flag (--tag value, repeatable)
+                    arrayFlags[arg, default: []].append(args[i + 1])
+                    i += 2
+                } else if valuedFlags.contains(arg), i + 1 < args.count {
                     // --key value pair
                     flags[arg] = args[i + 1]
                     i += 2
-                } else if !valuedFlags.contains(arg) {
+                } else if !valuedFlags.contains(arg), !arrayValuedFlags.contains(arg) {
                     // Boolean flag (--json, --run)
                     boolFlags.insert(arg)
                     i += 1
@@ -75,7 +86,8 @@ enum CLIParser {
             subcommand: subcommand.lowercased(),
             positionalArgs: positionalArgs,
             flags: flags,
-            boolFlags: boolFlags
+            boolFlags: boolFlags,
+            arrayFlags: arrayFlags
         )
     }
 
@@ -96,7 +108,7 @@ enum CLIParser {
                 message: message,
                 onClick: invocation.flags["--on-click"],
                 icon: invocation.flags["--icon"],
-                group: invocation.flags["--group"],
+                tags: invocation.arrayFlags["--tag"] ?? [],
                 sound: invocation.flags["--sound"]
             )
 
@@ -113,14 +125,14 @@ enum CLIParser {
         case "list":
             code = Commands.list(
                 json: invocation.boolFlags.contains("--json"),
-                group: invocation.flags["--group"]
+                tags: invocation.arrayFlags["--tag"] ?? []
             )
 
         case "count":
-            code = Commands.count(group: invocation.flags["--group"])
+            code = Commands.count(tags: invocation.arrayFlags["--tag"] ?? [])
 
         case "clear":
-            code = Commands.clear(group: invocation.flags["--group"])
+            code = Commands.clear(tags: invocation.arrayFlags["--tag"] ?? [])
 
         case "version":
             code = Commands.version()

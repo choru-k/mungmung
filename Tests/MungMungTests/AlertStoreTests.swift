@@ -112,25 +112,45 @@ final class AlertStoreTests: XCTestCase {
         XCTAssertEqual(listed[2].title, "Third")
     }
 
-    func testList_filteredByGroup() throws {
-        let ciAlert = Alert(title: "CI", message: "M", group: "ci")
-        let devAlert = Alert(title: "Dev", message: "M", group: "dev")
-        let noGroup = Alert(title: "No Group", message: "M")
+    func testList_filteredByTag() throws {
+        let ciAlert = Alert(title: "CI", message: "M", tags: ["ci"])
+        let devAlert = Alert(title: "Dev", message: "M", tags: ["dev"])
+        let noTags = Alert(title: "No Tags", message: "M")
 
         try store.save(ciAlert)
         try store.save(devAlert)
-        try store.save(noGroup)
+        try store.save(noTags)
 
-        let ciAlerts = store.list(group: "ci")
+        let ciAlerts = store.list(tags: ["ci"])
         XCTAssertEqual(ciAlerts.count, 1)
         XCTAssertEqual(ciAlerts[0].title, "CI")
 
-        let devAlerts = store.list(group: "dev")
+        let devAlerts = store.list(tags: ["dev"])
         XCTAssertEqual(devAlerts.count, 1)
         XCTAssertEqual(devAlerts[0].title, "Dev")
 
         let allAlerts = store.list()
         XCTAssertEqual(allAlerts.count, 3)
+    }
+
+    func testList_multiTagORFilter() throws {
+        let ciAlert = Alert(title: "CI", message: "M", tags: ["ci"])
+        let devAlert = Alert(title: "Dev", message: "M", tags: ["dev"])
+        let bothAlert = Alert(title: "Both", message: "M", tags: ["ci", "dev"])
+        let otherAlert = Alert(title: "Other", message: "M", tags: ["prod"])
+
+        try store.save(ciAlert)
+        try store.save(devAlert)
+        try store.save(bothAlert)
+        try store.save(otherAlert)
+
+        // Filter by ci OR dev — should match 3 alerts
+        let filtered = store.list(tags: ["ci", "dev"])
+        XCTAssertEqual(filtered.count, 3)
+        let titles = Set(filtered.map { $0.title })
+        XCTAssertTrue(titles.contains("CI"))
+        XCTAssertTrue(titles.contains("Dev"))
+        XCTAssertTrue(titles.contains("Both"))
     }
 
     // MARK: - Count
@@ -145,13 +165,13 @@ final class AlertStoreTests: XCTestCase {
         XCTAssertEqual(store.count(), 2)
     }
 
-    func testCount_filteredByGroup() throws {
-        try store.save(Alert(title: "A", message: "M", group: "ci"))
-        try store.save(Alert(title: "B", message: "M", group: "ci"))
-        try store.save(Alert(title: "C", message: "M", group: "dev"))
+    func testCount_filteredByTag() throws {
+        try store.save(Alert(title: "A", message: "M", tags: ["ci"]))
+        try store.save(Alert(title: "B", message: "M", tags: ["ci"]))
+        try store.save(Alert(title: "C", message: "M", tags: ["dev"]))
 
-        XCTAssertEqual(store.count(group: "ci"), 2)
-        XCTAssertEqual(store.count(group: "dev"), 1)
+        XCTAssertEqual(store.count(tags: ["ci"]), 2)
+        XCTAssertEqual(store.count(tags: ["dev"]), 1)
         XCTAssertEqual(store.count(), 3)
     }
 
@@ -174,21 +194,21 @@ final class AlertStoreTests: XCTestCase {
         XCTAssertEqual(removed.count, 2)
     }
 
-    func testClear_byGroup_onlyRemovesMatching() throws {
-        try store.save(Alert(title: "CI1", message: "M", group: "ci"))
-        try store.save(Alert(title: "CI2", message: "M", group: "ci"))
-        try store.save(Alert(title: "Dev", message: "M", group: "dev"))
+    func testClear_byTag_onlyRemovesMatching() throws {
+        try store.save(Alert(title: "CI1", message: "M", tags: ["ci"]))
+        try store.save(Alert(title: "CI2", message: "M", tags: ["ci"]))
+        try store.save(Alert(title: "Dev", message: "M", tags: ["dev"]))
 
-        let removed = store.clear(group: "ci")
+        let removed = store.clear(tags: ["ci"])
         XCTAssertEqual(removed.count, 2)
         XCTAssertEqual(store.count(), 1)
         XCTAssertEqual(store.list()[0].title, "Dev")
     }
 
-    func testClear_byGroup_nonexistentGroup_removesNothing() throws {
-        try store.save(Alert(title: "A", message: "M", group: "ci"))
+    func testClear_byTag_nonexistentTag_removesNothing() throws {
+        try store.save(Alert(title: "A", message: "M", tags: ["ci"]))
 
-        let removed = store.clear(group: "nonexistent")
+        let removed = store.clear(tags: ["nonexistent"])
         XCTAssertTrue(removed.isEmpty)
         XCTAssertEqual(store.count(), 1)
     }

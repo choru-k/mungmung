@@ -16,7 +16,7 @@ enum Commands {
         message: String,
         onClick: String?,
         icon: String?,
-        group: String?,
+        tags: [String] = [],
         sound: String?,
         store: AlertStore = AlertStore(),
         notifications: NotificationSending = NotificationManager(),
@@ -31,7 +31,7 @@ enum Commands {
             message: message,
             onClick: onClick,
             icon: icon,
-            group: group,
+            tags: tags,
             sound: sound
         )
 
@@ -82,11 +82,11 @@ enum Commands {
     @discardableResult
     static func list(
         json: Bool,
-        group: String?,
+        tags: [String] = [],
         store: AlertStore = AlertStore(),
         output: (String) -> Void = { print($0) }
     ) -> Int32 {
-        let alerts = store.list(group: group)
+        let alerts = store.list(tags: tags)
 
         if json {
             let encoder = JSONEncoder()
@@ -103,14 +103,15 @@ enum Commands {
                 output("No pending alerts.")
             } else {
                 // Header
-                output("\("ID".padding(toLength: 26, withPad: " ", startingAt: 0))\("GROUP".padding(toLength: 10, withPad: " ", startingAt: 0))\("ICON".padding(toLength: 5, withPad: " ", startingAt: 0))\("TITLE".padding(toLength: 20, withPad: " ", startingAt: 0))AGE")
+                output("\("ID".padding(toLength: 26, withPad: " ", startingAt: 0))\("TAGS".padding(toLength: 14, withPad: " ", startingAt: 0))\("ICON".padding(toLength: 5, withPad: " ", startingAt: 0))\("TITLE".padding(toLength: 20, withPad: " ", startingAt: 0))AGE")
 
                 for alert in alerts {
                     let id = alert.id.padding(toLength: 26, withPad: " ", startingAt: 0)
-                    let group = (alert.group ?? "-").padding(toLength: 10, withPad: " ", startingAt: 0)
+                    let tagsStr = (alert.tags.isEmpty ? "-" : alert.tags.joined(separator: ","))
+                    let tags = String(tagsStr.prefix(14)).padding(toLength: 14, withPad: " ", startingAt: 0)
                     let icon = (alert.icon ?? "-").padding(toLength: 5, withPad: " ", startingAt: 0)
                     let title = String(alert.title.prefix(20)).padding(toLength: 20, withPad: " ", startingAt: 0)
-                    output("\(id)\(group)\(icon)\(title)\(alert.age)")
+                    output("\(id)\(tags)\(icon)\(title)\(alert.age)")
                 }
             }
         }
@@ -123,26 +124,26 @@ enum Commands {
     /// Print the number of pending alerts.
     @discardableResult
     static func count(
-        group: String?,
+        tags: [String] = [],
         store: AlertStore = AlertStore(),
         output: (String) -> Void = { print($0) }
     ) -> Int32 {
-        output("\(store.count(group: group))")
+        output("\(store.count(tags: tags))")
         return 0
     }
 
     // MARK: - clear
 
-    /// Remove all alerts (or all in a group).
+    /// Remove all alerts (or all matching given tags).
     @discardableResult
     static func clear(
-        group: String?,
+        tags: [String] = [],
         store: AlertStore = AlertStore(),
         notifications: NotificationSending = NotificationManager(),
         shell: ShellExecuting = ShellRunner(),
         output: (String) -> Void = { print($0) }
     ) -> Int32 {
-        let removed = store.clear(group: group)
+        let removed = store.clear(tags: tags)
         let ids = removed.map { $0.id }
 
         notifications.remove(alertIDs: ids)
@@ -180,8 +181,8 @@ enum Commands {
                    --title "..."       Alert title (required)
                    --message "..."     Alert message (required)
                    --on-click "cmd"    Command to run on notification click
-                   --icon "\u{1F514}"         Icon emoji
-                   --group "name"      Group name for filtering
+                   --icon "..."        Icon (emoji, SF Symbol name, or image path)
+                   --tag "name"        Tag for filtering (repeatable)
                    --sound "default"   Notification sound
 
           done     Dismiss alert by ID
@@ -190,13 +191,13 @@ enum Commands {
 
           list     List pending alerts
                    --json              Output as JSON
-                   --group "name"      Filter by group
+                   --tag "name"        Filter by tag (repeatable, OR match)
 
           count    Print number of pending alerts
-                   --group "name"      Filter by group
+                   --tag "name"        Filter by tag (repeatable, OR match)
 
           clear    Dismiss all alerts
-                   --group "name"      Clear only this group
+                   --tag "name"        Clear only alerts with this tag (repeatable, OR match)
 
           version  Print version
           help     Show this help

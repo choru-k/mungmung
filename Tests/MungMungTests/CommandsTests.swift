@@ -32,7 +32,7 @@ final class CommandsTests: XCTestCase {
     func testAddReturnsZeroAndPrintsID() {
         let code = Commands.add(
             title: "Test", message: "Hello",
-            onClick: nil, icon: nil, group: nil, sound: nil,
+            onClick: nil, icon: nil, tags: [], sound: nil,
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture, errorOutput: errorCapture.capture
         )
@@ -44,7 +44,7 @@ final class CommandsTests: XCTestCase {
     func testAddSavesAlertToStore() {
         Commands.add(
             title: "Test", message: "Hello",
-            onClick: nil, icon: nil, group: nil, sound: nil,
+            onClick: nil, icon: nil, tags: [], sound: nil,
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture, errorOutput: errorCapture.capture
         )
@@ -55,7 +55,7 @@ final class CommandsTests: XCTestCase {
     func testAddRequestsPermission() {
         Commands.add(
             title: "Test", message: "Hello",
-            onClick: nil, icon: nil, group: nil, sound: nil,
+            onClick: nil, icon: nil, tags: [], sound: nil,
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture, errorOutput: errorCapture.capture
         )
@@ -65,7 +65,7 @@ final class CommandsTests: XCTestCase {
     func testAddSendsNotification() {
         Commands.add(
             title: "Test", message: "Hello",
-            onClick: nil, icon: nil, group: nil, sound: nil,
+            onClick: nil, icon: nil, tags: [], sound: nil,
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture, errorOutput: errorCapture.capture
         )
@@ -76,7 +76,7 @@ final class CommandsTests: XCTestCase {
     func testAddTriggersSketchybar() {
         Commands.add(
             title: "Test", message: "Hello",
-            onClick: nil, icon: nil, group: nil, sound: nil,
+            onClick: nil, icon: nil, tags: [], sound: nil,
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture, errorOutput: errorCapture.capture
         )
@@ -86,14 +86,14 @@ final class CommandsTests: XCTestCase {
     func testAddSetsOptionalFields() {
         Commands.add(
             title: "Test", message: "Hello",
-            onClick: "open http://example.com", icon: "\u{1F514}", group: "work", sound: "default",
+            onClick: "open http://example.com", icon: "\u{1F514}", tags: ["work"], sound: "default",
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture, errorOutput: errorCapture.capture
         )
         let alert = store.list()[0]
         XCTAssertEqual(alert.onClick, "open http://example.com")
         XCTAssertEqual(alert.icon, "\u{1F514}")
-        XCTAssertEqual(alert.group, "work")
+        XCTAssertEqual(alert.tags, ["work"])
         XCTAssertEqual(alert.sound, "default")
     }
 
@@ -170,7 +170,7 @@ final class CommandsTests: XCTestCase {
 
     func testListEmptyPrintsMessage() {
         Commands.list(
-            json: false, group: nil,
+            json: false, tags: [],
             store: store, output: outputCapture.capture
         )
         XCTAssertTrue(outputCapture.text.contains("No pending alerts"))
@@ -179,17 +179,18 @@ final class CommandsTests: XCTestCase {
     func testListWithAlertsPrintsTable() {
         try! store.save(Alert(title: "Test Alert", message: "Hello"))
         Commands.list(
-            json: false, group: nil,
+            json: false, tags: [],
             store: store, output: outputCapture.capture
         )
         XCTAssertTrue(outputCapture.text.contains("ID"))
+        XCTAssertTrue(outputCapture.text.contains("TAGS"))
         XCTAssertTrue(outputCapture.text.contains("Test Alert"))
     }
 
     func testListJSONOutputsValidJSON() {
         try! store.save(Alert(title: "Test", message: "Hello"))
         Commands.list(
-            json: true, group: nil,
+            json: true, tags: [],
             store: store, output: outputCapture.capture
         )
         let jsonData = outputCapture.text.data(using: .utf8)!
@@ -201,7 +202,7 @@ final class CommandsTests: XCTestCase {
 
     func testListEmptyJSONOutputsEmptyArray() {
         Commands.list(
-            json: true, group: nil,
+            json: true, tags: [],
             store: store, output: outputCapture.capture
         )
         let trimmed = outputCapture.text
@@ -209,11 +210,11 @@ final class CommandsTests: XCTestCase {
         XCTAssertEqual(trimmed, "[]")
     }
 
-    func testListGroupFilter() {
-        try! store.save(Alert(title: "A", message: "M", group: "work"))
-        try! store.save(Alert(title: "B", message: "M", group: "personal"))
+    func testListTagFilter() {
+        try! store.save(Alert(title: "A", message: "M", tags: ["work"]))
+        try! store.save(Alert(title: "B", message: "M", tags: ["personal"]))
         Commands.list(
-            json: false, group: "work",
+            json: false, tags: ["work"],
             store: store, output: outputCapture.capture
         )
         XCTAssertTrue(outputCapture.text.contains("A"))
@@ -224,7 +225,7 @@ final class CommandsTests: XCTestCase {
 
     func testCountEmptyReturnsZero() {
         Commands.count(
-            group: nil,
+            tags: [],
             store: store, output: outputCapture.capture
         )
         XCTAssertEqual(outputCapture.text, "0")
@@ -234,17 +235,17 @@ final class CommandsTests: XCTestCase {
         try! store.save(Alert(title: "A", message: "M"))
         try! store.save(Alert(title: "B", message: "M"))
         Commands.count(
-            group: nil,
+            tags: [],
             store: store, output: outputCapture.capture
         )
         XCTAssertEqual(outputCapture.text, "2")
     }
 
-    func testCountGroupFilter() {
-        try! store.save(Alert(title: "A", message: "M", group: "work"))
-        try! store.save(Alert(title: "B", message: "M", group: "personal"))
+    func testCountTagFilter() {
+        try! store.save(Alert(title: "A", message: "M", tags: ["work"]))
+        try! store.save(Alert(title: "B", message: "M", tags: ["personal"]))
         Commands.count(
-            group: "work",
+            tags: ["work"],
             store: store, output: outputCapture.capture
         )
         XCTAssertEqual(outputCapture.text, "1")
@@ -256,7 +257,7 @@ final class CommandsTests: XCTestCase {
         try! store.save(Alert(title: "A", message: "M"))
         try! store.save(Alert(title: "B", message: "M"))
         let code = Commands.clear(
-            group: nil,
+            tags: [],
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture
         )
@@ -268,7 +269,7 @@ final class CommandsTests: XCTestCase {
     func testClearRemovesNotificationsAndTriggersSketchybar() {
         try! store.save(Alert(title: "A", message: "M"))
         Commands.clear(
-            group: nil,
+            tags: [],
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture
         )
@@ -276,22 +277,22 @@ final class CommandsTests: XCTestCase {
         XCTAssertEqual(mockShell.triggerSketchybarCount, 1)
     }
 
-    func testClearGroupFilter() {
-        try! store.save(Alert(title: "A", message: "M", group: "work"))
-        try! store.save(Alert(title: "B", message: "M", group: "personal"))
+    func testClearTagFilter() {
+        try! store.save(Alert(title: "A", message: "M", tags: ["work"]))
+        try! store.save(Alert(title: "B", message: "M", tags: ["personal"]))
         Commands.clear(
-            group: "work",
+            tags: ["work"],
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture
         )
         XCTAssertEqual(store.list().count, 1)
-        XCTAssertEqual(store.list()[0].group, "personal")
+        XCTAssertEqual(store.list()[0].tags, ["personal"])
     }
 
     func testClearSingularGrammar() {
         try! store.save(Alert(title: "A", message: "M"))
         Commands.clear(
-            group: nil,
+            tags: [],
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture
         )
@@ -327,6 +328,6 @@ final class CommandsTests: XCTestCase {
         XCTAssertTrue(text.contains("--message"))
         XCTAssertTrue(text.contains("--json"))
         XCTAssertTrue(text.contains("--run"))
-        XCTAssertTrue(text.contains("--group"))
+        XCTAssertTrue(text.contains("--tag"))
     }
 }

@@ -117,6 +117,15 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertTrue(result.stderr.contains("--message"))
     }
 
+    func testAddWithMultipleTags() {
+        let result = run("add", "--title", "Test", "--message", "Hello", "--tag", "ci", "--tag", "deploy")
+        XCTAssertEqual(result.exitCode, 0)
+
+        let listResult = run("list", "--json")
+        XCTAssertTrue(listResult.stdout.contains("ci"))
+        XCTAssertTrue(listResult.stdout.contains("deploy"))
+    }
+
     // MARK: - list
 
     func testListEmptyStore() {
@@ -147,11 +156,11 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertEqual(array?.count, 1)
     }
 
-    func testListGroupFilter() {
-        run("add", "--title", "A", "--message", "M", "--group", "work")
-        run("add", "--title", "B", "--message", "M", "--group", "personal")
+    func testListTagFilter() {
+        run("add", "--title", "A", "--message", "M", "--tag", "work")
+        run("add", "--title", "B", "--message", "M", "--tag", "personal")
 
-        let result = run("list", "--group", "work")
+        let result = run("list", "--tag", "work")
         XCTAssertTrue(result.stdout.contains("A"))
         XCTAssertFalse(result.stdout.contains("B"))
     }
@@ -172,11 +181,11 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertTrue(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "2")
     }
 
-    func testCountGroupFilter() {
-        run("add", "--title", "A", "--message", "M", "--group", "work")
-        run("add", "--title", "B", "--message", "M", "--group", "personal")
+    func testCountTagFilter() {
+        run("add", "--title", "A", "--message", "M", "--tag", "work")
+        run("add", "--title", "B", "--message", "M", "--tag", "personal")
 
-        let result = run("count", "--group", "work")
+        let result = run("count", "--tag", "work")
         XCTAssertTrue(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
     }
 
@@ -218,11 +227,11 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertTrue(countResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "0")
     }
 
-    func testClearByGroup() {
-        run("add", "--title", "A", "--message", "M", "--group", "work")
-        run("add", "--title", "B", "--message", "M", "--group", "personal")
+    func testClearByTag() {
+        run("add", "--title", "A", "--message", "M", "--tag", "work")
+        run("add", "--title", "B", "--message", "M", "--tag", "personal")
 
-        let result = run("clear", "--group", "work")
+        let result = run("clear", "--tag", "work")
         XCTAssertTrue(result.stdout.contains("1 alert"))
 
         let countResult = run("count")
@@ -233,7 +242,7 @@ final class CLIIntegrationTests: XCTestCase {
 
     func testFullLifecycle() {
         // Add
-        let addResult = run("add", "--title", "Lifecycle", "--message", "Test", "--group", "test")
+        let addResult = run("add", "--title", "Lifecycle", "--message", "Test", "--tag", "test")
         XCTAssertEqual(addResult.exitCode, 0)
         let id = addResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
 

@@ -11,6 +11,7 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(inv.positionalArgs.isEmpty)
         XCTAssertTrue(inv.flags.isEmpty)
         XCTAssertTrue(inv.boolFlags.isEmpty)
+        XCTAssertTrue(inv.arrayFlags.isEmpty)
     }
 
     // MARK: - Subcommand
@@ -21,6 +22,7 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(inv.positionalArgs.isEmpty)
         XCTAssertTrue(inv.flags.isEmpty)
         XCTAssertTrue(inv.boolFlags.isEmpty)
+        XCTAssertTrue(inv.arrayFlags.isEmpty)
     }
 
     func testSubcommandIsLowercased() {
@@ -44,23 +46,48 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(inv.boolFlags.isEmpty)
     }
 
-    func testAllSixValuedFlags() {
+    func testAllValuedFlags() {
         let inv = CLIParser.parse([
             "add",
             "--title", "T",
             "--message", "M",
             "--on-click", "open .",
             "--icon", "🔔",
-            "--group", "ci",
             "--sound", "default"
         ])
-        XCTAssertEqual(inv.flags.count, 6)
+        XCTAssertEqual(inv.flags.count, 5)
         XCTAssertEqual(inv.flags["--title"], "T")
         XCTAssertEqual(inv.flags["--message"], "M")
         XCTAssertEqual(inv.flags["--on-click"], "open .")
         XCTAssertEqual(inv.flags["--icon"], "🔔")
-        XCTAssertEqual(inv.flags["--group"], "ci")
         XCTAssertEqual(inv.flags["--sound"], "default")
+    }
+
+    // MARK: - Array Flags
+
+    func testSingleTag() {
+        let inv = CLIParser.parse(["add", "--title", "T", "--message", "M", "--tag", "ci"])
+        XCTAssertEqual(inv.arrayFlags["--tag"], ["ci"])
+    }
+
+    func testMultipleTags() {
+        let inv = CLIParser.parse([
+            "add", "--title", "T", "--message", "M",
+            "--tag", "ci", "--tag", "deploy"
+        ])
+        XCTAssertEqual(inv.arrayFlags["--tag"], ["ci", "deploy"])
+    }
+
+    func testTagNotInValuedFlags() {
+        let inv = CLIParser.parse(["add", "--title", "T", "--message", "M", "--tag", "ci"])
+        XCTAssertNil(inv.flags["--tag"], "--tag should not appear in valued flags")
+    }
+
+    func testListWithTag() {
+        let inv = CLIParser.parse(["list", "--json", "--tag", "ci"])
+        XCTAssertEqual(inv.subcommand, "list")
+        XCTAssertTrue(inv.boolFlags.contains("--json"))
+        XCTAssertEqual(inv.arrayFlags["--tag"], ["ci"])
     }
 
     // MARK: - Boolean Flags
@@ -100,11 +127,11 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(inv.boolFlags.contains("--run"))
     }
 
-    func testMixed_valuedFlagAndBoolFlag() {
-        let inv = CLIParser.parse(["list", "--json", "--group", "ci"])
+    func testMixed_valuedFlagAndBoolFlagAndArrayFlag() {
+        let inv = CLIParser.parse(["list", "--json", "--tag", "ci"])
         XCTAssertEqual(inv.subcommand, "list")
         XCTAssertTrue(inv.boolFlags.contains("--json"))
-        XCTAssertEqual(inv.flags["--group"], "ci")
+        XCTAssertEqual(inv.arrayFlags["--tag"], ["ci"])
     }
 
     // MARK: - Edge Cases
@@ -119,5 +146,11 @@ final class CLIParserTests: XCTestCase {
         let inv = CLIParser.parse(["add", "--title", "Hello World", "--message", "Line one"])
         XCTAssertEqual(inv.flags["--title"], "Hello World")
         XCTAssertEqual(inv.flags["--message"], "Line one")
+    }
+
+    func testArrayFlagWithoutValue_atEndOfArgs() {
+        let inv = CLIParser.parse(["add", "--title", "T", "--message", "M", "--tag"])
+        XCTAssertTrue(inv.boolFlags.contains("--tag"))
+        XCTAssertTrue(inv.arrayFlags.isEmpty)
     }
 }

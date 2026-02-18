@@ -39,11 +39,11 @@ final class AlertTests: XCTestCase {
         XCTAssertLessThan(abs(alert.createdAt.timeIntervalSinceNow), 1.0)
     }
 
-    func testConvenienceInit_optionalFieldsDefaultToNil() {
+    func testConvenienceInit_optionalFieldsDefaultToNilOrEmpty() {
         let alert = Alert(title: "T", message: "M")
         XCTAssertNil(alert.onClick)
         XCTAssertNil(alert.icon)
-        XCTAssertNil(alert.group)
+        XCTAssertTrue(alert.tags.isEmpty)
         XCTAssertNil(alert.sound)
     }
 
@@ -51,12 +51,17 @@ final class AlertTests: XCTestCase {
         let alert = Alert(
             title: "T", message: "M",
             onClick: "open .", icon: "🔔",
-            group: "ci", sound: "default"
+            tags: ["ci"], sound: "default"
         )
         XCTAssertEqual(alert.onClick, "open .")
         XCTAssertEqual(alert.icon, "🔔")
-        XCTAssertEqual(alert.group, "ci")
+        XCTAssertEqual(alert.tags, ["ci"])
         XCTAssertEqual(alert.sound, "default")
+    }
+
+    func testConvenienceInit_multipleTags() {
+        let alert = Alert(title: "T", message: "M", tags: ["ci", "deploy"])
+        XCTAssertEqual(alert.tags, ["ci", "deploy"])
     }
 
     // MARK: - Codable Round-Trip
@@ -65,7 +70,7 @@ final class AlertTests: XCTestCase {
         let original = Alert(
             title: "Claude Code", message: "Waiting for input",
             onClick: "aerospace workspace Terminal",
-            icon: "🤖", group: "claude", sound: "default"
+            icon: "🤖", tags: ["claude"], sound: "default"
         )
         let data = try encoder.encode(original)
         let decoded = try decoder.decode(Alert.self, from: data)
@@ -75,12 +80,19 @@ final class AlertTests: XCTestCase {
         XCTAssertEqual(decoded.message, original.message)
         XCTAssertEqual(decoded.onClick, original.onClick)
         XCTAssertEqual(decoded.icon, original.icon)
-        XCTAssertEqual(decoded.group, original.group)
+        XCTAssertEqual(decoded.tags, original.tags)
         XCTAssertEqual(decoded.sound, original.sound)
         XCTAssertEqual(
             Int(decoded.createdAt.timeIntervalSince1970),
             Int(original.createdAt.timeIntervalSince1970)
         )
+    }
+
+    func testCodableRoundTrip_multipleTags() throws {
+        let original = Alert(title: "T", message: "M", tags: ["ci", "deploy", "prod"])
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(Alert.self, from: data)
+        XCTAssertEqual(decoded.tags, ["ci", "deploy", "prod"])
     }
 
     func testCodableRoundTrip_minimalFields() throws {
@@ -93,7 +105,7 @@ final class AlertTests: XCTestCase {
         XCTAssertEqual(decoded.message, original.message)
         XCTAssertNil(decoded.onClick)
         XCTAssertNil(decoded.icon)
-        XCTAssertNil(decoded.group)
+        XCTAssertTrue(decoded.tags.isEmpty)
         XCTAssertNil(decoded.sound)
     }
 
@@ -106,8 +118,10 @@ final class AlertTests: XCTestCase {
 
         XCTAssertTrue(json.contains("\"on_click\""), "JSON should use 'on_click' not 'onClick'")
         XCTAssertTrue(json.contains("\"created_at\""), "JSON should use 'created_at' not 'createdAt'")
+        XCTAssertTrue(json.contains("\"tags\""), "JSON should contain 'tags' key")
         XCTAssertFalse(json.contains("\"onClick\""))
         XCTAssertFalse(json.contains("\"createdAt\""))
+        XCTAssertFalse(json.contains("\"group\""), "JSON should not contain legacy 'group' key")
     }
 
     func testDecodeFromExternalJSON() throws {
@@ -118,7 +132,7 @@ final class AlertTests: XCTestCase {
           "message": "Waiting for input",
           "on_click": "aerospace workspace Terminal",
           "icon": "🤖",
-          "group": "claude",
+          "tags": ["claude"],
           "sound": "default",
           "created_at": "2026-02-09T12:00:00Z"
         }
@@ -128,6 +142,36 @@ final class AlertTests: XCTestCase {
         XCTAssertEqual(alert.id, "1738000000_a1b2c3d4")
         XCTAssertEqual(alert.title, "Claude Code")
         XCTAssertEqual(alert.onClick, "aerospace workspace Terminal")
+        XCTAssertEqual(alert.tags, ["claude"])
+    }
+
+    // MARK: - Backward Compatibility
+
+    func testDecodeFromLegacyGroupJSON() throws {
+        let json = """
+        {
+          "id": "1738000000_a1b2c3d4",
+          "title": "Claude Code",
+          "message": "Waiting for input",
+          "group": "claude",
+          "created_at": "2026-02-09T12:00:00Z"
+        }
+        """
+        let alert = try decoder.decode(Alert.self, from: json.data(using: .utf8)!)
+        XCTAssertEqual(alert.tags, ["claude"], "Legacy 'group' should be decoded into tags array")
+    }
+
+    func testDecodeFromLegacyJSON_noGroup() throws {
+        let json = """
+        {
+          "id": "1738000000_a1b2c3d4",
+          "title": "Test",
+          "message": "Hello",
+          "created_at": "2026-02-09T12:00:00Z"
+        }
+        """
+        let alert = try decoder.decode(Alert.self, from: json.data(using: .utf8)!)
+        XCTAssertTrue(alert.tags.isEmpty, "No group or tags should result in empty tags array")
     }
 
     // MARK: - Age Computed Property
