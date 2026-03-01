@@ -86,7 +86,8 @@ final class CommandsTests: XCTestCase {
     func testAddSetsOptionalFields() {
         Commands.add(
             title: "Test", message: "Hello",
-            onClick: "open http://example.com", icon: "\u{1F514}", tags: ["work"], sound: "default",
+            onClick: "open http://example.com", icon: "\u{1F514}", tags: ["work"],
+            source: "pi-agent", session: "sess-1", kind: "update", dedupeKey: "pi:update:sess-1", sound: "default",
             store: store, notifications: mockNotifications, shell: mockShell,
             output: outputCapture.capture, errorOutput: errorCapture.capture
         )
@@ -94,7 +95,91 @@ final class CommandsTests: XCTestCase {
         XCTAssertEqual(alert.onClick, "open http://example.com")
         XCTAssertEqual(alert.icon, "\u{1F514}")
         XCTAssertEqual(alert.tags, ["work"])
+        XCTAssertEqual(alert.source, "pi-agent")
+        XCTAssertEqual(alert.session, "sess-1")
+        XCTAssertEqual(alert.kind, "update")
+        XCTAssertEqual(alert.dedupeKey, "pi:update:sess-1")
         XCTAssertEqual(alert.sound, "default")
+    }
+
+    func testAddWithDedupeKey_replacesExistingInSameSession() {
+        Commands.add(
+            title: "First",
+            message: "One",
+            onClick: nil,
+            icon: nil,
+            source: "pi-agent",
+            session: "s1",
+            kind: "update",
+            dedupeKey: "pi:update",
+            sound: nil,
+            store: store,
+            notifications: mockNotifications,
+            shell: mockShell,
+            output: outputCapture.capture,
+            errorOutput: errorCapture.capture
+        )
+
+        Commands.add(
+            title: "Second",
+            message: "Two",
+            onClick: nil,
+            icon: nil,
+            source: "pi-agent",
+            session: "s1",
+            kind: "update",
+            dedupeKey: "pi:update",
+            sound: nil,
+            store: store,
+            notifications: mockNotifications,
+            shell: mockShell,
+            output: outputCapture.capture,
+            errorOutput: errorCapture.capture
+        )
+
+        let alerts = store.list(sessions: ["s1"], dedupeKeys: ["pi:update"])
+        XCTAssertEqual(alerts.count, 1)
+        XCTAssertEqual(alerts.first?.title, "Second")
+        XCTAssertEqual(mockNotifications.removedAlertIDsBatch.count, 1)
+    }
+
+    func testAddWithDedupeKey_doesNotReplaceAcrossSessions() {
+        Commands.add(
+            title: "Session One",
+            message: "One",
+            onClick: nil,
+            icon: nil,
+            source: "pi-agent",
+            session: "s1",
+            kind: "update",
+            dedupeKey: "pi:update",
+            sound: nil,
+            store: store,
+            notifications: mockNotifications,
+            shell: mockShell,
+            output: outputCapture.capture,
+            errorOutput: errorCapture.capture
+        )
+
+        Commands.add(
+            title: "Session Two",
+            message: "Two",
+            onClick: nil,
+            icon: nil,
+            source: "pi-agent",
+            session: "s2",
+            kind: "update",
+            dedupeKey: "pi:update",
+            sound: nil,
+            store: store,
+            notifications: mockNotifications,
+            shell: mockShell,
+            output: outputCapture.capture,
+            errorOutput: errorCapture.capture
+        )
+
+        let alerts = store.list(dedupeKeys: ["pi:update"])
+        XCTAssertEqual(alerts.count, 2)
     }
 
     // MARK: - done
@@ -221,6 +306,58 @@ final class CommandsTests: XCTestCase {
         XCTAssertFalse(outputCapture.text.contains("B"))
     }
 
+    func testListMetadataFilter_source() {
+        try! store.save(Alert(title: "A", message: "M", source: "pi-agent"))
+        try! store.save(Alert(title: "B", message: "M", source: "claude"))
+
+        Commands.list(
+            json: false,
+            sources: ["pi-agent"],
+            store: store,
+            output: outputCapture.capture
+        )
+
+        XCTAssertTrue(outputCapture.text.contains("A"))
+        XCTAssertFalse(outputCapture.text.contains("B"))
+    }
+
+    func testListMetadataFilter_dedupeKey() {
+        try! store.save(Alert(title: "A", message: "M", dedupeKey: "k1"))
+        try! store.save(Alert(title: "B", message: "M", dedupeKey: "k2"))
+
+        Commands.list(
+            json: true,
+            dedupeKeys: ["k1"],
+            store: store,
+            output: outputCapture.capture
+        )
+
+        let data = outputCapture.text.data(using: .utf8)!
+        let parsed = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(parsed.count, 1)
+        XCTAssertEqual(parsed.first?["title"] as? String, "A")
+    }
+
+    func testListFiltersCombineWithANDAcrossDimensions() {
+        try! store.save(Alert(title: "A", message: "M", tags: ["team"], source: "pi-agent", kind: "update"))
+        try! store.save(Alert(title: "B", message: "M", tags: ["team"], source: "pi-agent", kind: "action"))
+        try! store.save(Alert(title: "C", message: "M", tags: ["team"], source: "claude", kind: "update"))
+
+        Commands.list(
+            json: true,
+            tags: ["team"],
+            sources: ["pi-agent"],
+            kinds: ["update"],
+            store: store,
+            output: outputCapture.capture
+        )
+
+        let data = outputCapture.text.data(using: .utf8)!
+        let parsed = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(parsed.count, 1)
+        XCTAssertEqual(parsed.first?["title"] as? String, "A")
+    }
+
     // MARK: - count
 
     func testCountEmptyReturnsZero() {
@@ -249,6 +386,35 @@ final class CommandsTests: XCTestCase {
             store: store, output: outputCapture.capture
         )
         XCTAssertEqual(outputCapture.text, "1")
+    }
+
+    func testCountMetadataFilter() {
+        try! store.save(Alert(title: "A", message: "M", source: "pi-agent", session: "s1"))
+        try! store.save(Alert(title: "B", message: "M", source: "pi-agent", session: "s2"))
+        try! store.save(Alert(title: "C", message: "M", source: "claude", session: "s1"))
+
+        Commands.count(
+            sources: ["pi-agent"],
+            sessions: ["s1"],
+            store: store,
+            output: outputCapture.capture
+        )
+
+        XCTAssertEqual(outputCapture.text, "1")
+    }
+
+    func testCountMetadataFilter_dedupeKey() {
+        try! store.save(Alert(title: "A", message: "M", dedupeKey: "k1"))
+        try! store.save(Alert(title: "B", message: "M", dedupeKey: "k1"))
+        try! store.save(Alert(title: "C", message: "M", dedupeKey: "k2"))
+
+        Commands.count(
+            dedupeKeys: ["k1"],
+            store: store,
+            output: outputCapture.capture
+        )
+
+        XCTAssertEqual(outputCapture.text, "2")
     }
 
     // MARK: - clear
@@ -289,6 +455,43 @@ final class CommandsTests: XCTestCase {
         XCTAssertEqual(store.list()[0].tags, ["personal"])
     }
 
+    func testClearMetadataFilter() {
+        try! store.save(Alert(title: "A", message: "M", source: "pi-agent", kind: "update"))
+        try! store.save(Alert(title: "B", message: "M", source: "pi-agent", kind: "action"))
+        try! store.save(Alert(title: "C", message: "M", source: "claude", kind: "update"))
+
+        Commands.clear(
+            sources: ["pi-agent"],
+            kinds: ["update"],
+            store: store,
+            notifications: mockNotifications,
+            shell: mockShell,
+            output: outputCapture.capture
+        )
+
+        XCTAssertEqual(store.list().count, 2)
+        let remainingTitles = Set(store.list().map { $0.title })
+        XCTAssertTrue(remainingTitles.contains("B"))
+        XCTAssertTrue(remainingTitles.contains("C"))
+    }
+
+    func testClearMetadataFilter_dedupeKey() {
+        try! store.save(Alert(title: "A", message: "M", dedupeKey: "k1"))
+        try! store.save(Alert(title: "B", message: "M", dedupeKey: "k2"))
+        try! store.save(Alert(title: "C", message: "M", dedupeKey: "k1"))
+
+        Commands.clear(
+            dedupeKeys: ["k1"],
+            store: store,
+            notifications: mockNotifications,
+            shell: mockShell,
+            output: outputCapture.capture
+        )
+
+        XCTAssertEqual(store.list().count, 1)
+        XCTAssertEqual(store.list().first?.title, "B")
+    }
+
     func testClearSingularGrammar() {
         try! store.save(Alert(title: "A", message: "M"))
         Commands.clear(
@@ -298,6 +501,55 @@ final class CommandsTests: XCTestCase {
         )
         XCTAssertTrue(outputCapture.text.contains("1 alert."))
         XCTAssertFalse(outputCapture.text.contains("1 alerts"))
+    }
+
+    // MARK: - doctor
+
+    func testDoctorTextOutputContainsCoreFields() {
+        try! store.save(Alert(title: "A", message: "M"))
+
+        let code = Commands.doctor(
+            json: false,
+            store: store,
+            output: outputCapture.capture
+        )
+
+        XCTAssertEqual(code, 0)
+        let text = outputCapture.text
+        XCTAssertTrue(text.contains("mung doctor"))
+        XCTAssertTrue(text.contains("version:"))
+        XCTAssertTrue(text.contains("alerts_dir:"))
+        XCTAssertTrue(text.contains("alert_count: 1"))
+        XCTAssertTrue(text.contains("on_click_shell:"))
+        XCTAssertTrue(text.contains("notifications_available:"))
+    }
+
+    func testDoctorJSONOutputsValidReport() {
+        try! store.save(Alert(title: "A", message: "M"))
+
+        let code = Commands.doctor(
+            json: true,
+            store: store,
+            output: outputCapture.capture
+        )
+
+        XCTAssertEqual(code, 0)
+
+        let data = outputCapture.text.data(using: .utf8)!
+        let parsed = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        let version = parsed["version"] as? String
+        XCTAssertNotNil(version)
+        XCTAssertFalse(version?.isEmpty ?? true)
+        XCTAssertEqual(parsed["bundledExecutable"] as? Bool, false)
+
+        let state = parsed["state"] as? [String: Any]
+        XCTAssertEqual(state?["alertCount"] as? Int, 1)
+
+        let action = parsed["actionExecution"] as? [String: Any]
+        let shellPath = action?["shellPath"] as? String
+        XCTAssertNotNil(shellPath)
+        XCTAssertFalse(shellPath?.isEmpty ?? true)
     }
 
     // MARK: - version
@@ -317,6 +569,7 @@ final class CommandsTests: XCTestCase {
         XCTAssertTrue(text.contains("list"))
         XCTAssertTrue(text.contains("count"))
         XCTAssertTrue(text.contains("clear"))
+        XCTAssertTrue(text.contains("doctor"))
         XCTAssertTrue(text.contains("version"))
         XCTAssertTrue(text.contains("help"))
     }
@@ -329,5 +582,11 @@ final class CommandsTests: XCTestCase {
         XCTAssertTrue(text.contains("--json"))
         XCTAssertTrue(text.contains("--run"))
         XCTAssertTrue(text.contains("--tag"))
+        XCTAssertTrue(text.contains("--source"))
+        XCTAssertTrue(text.contains("--session"))
+        XCTAssertTrue(text.contains("--kind"))
+        XCTAssertTrue(text.contains("--dedupe-key"))
+        XCTAssertTrue(text.contains("MUNG_DEBUG_ACTIONS"))
+        XCTAssertTrue(text.contains("MUNG_DEBUG_LIFECYCLE"))
     }
 }

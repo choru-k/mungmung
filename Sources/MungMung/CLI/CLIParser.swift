@@ -11,7 +11,8 @@ import Foundation
 ///
 /// Supports:
 /// - Subcommand as first positional argument: `mung add`, `mung done`
-/// - `--key value` flags: `--title "Hello"`, `--group claude`
+/// - `--key value` flags: `--title "Hello"`, `--on-click "open ."`
+/// - Repeatable array flags: `--tag`, `--source`, `--session`, `--kind`, `--dedupe-key`
 /// - Boolean flags: `--json`, `--run`
 /// - Positional arguments after subcommand: `mung done <id>`
 enum CLIParser {
@@ -33,7 +34,7 @@ enum CLIParser {
 
     /// Flags that can be repeated to accumulate an array of values.
     private static let arrayValuedFlags: Set<String> = [
-        "--tag"
+        "--tag", "--source", "--session", "--kind", "--dedupe-key"
     ]
 
     /// Parse raw arguments into an Invocation.
@@ -109,6 +110,10 @@ enum CLIParser {
                 onClick: invocation.flags["--on-click"],
                 icon: invocation.flags["--icon"],
                 tags: invocation.arrayFlags["--tag"] ?? [],
+                source: (invocation.arrayFlags["--source"] ?? []).last,
+                session: (invocation.arrayFlags["--session"] ?? []).last,
+                kind: (invocation.arrayFlags["--kind"] ?? []).last,
+                dedupeKey: (invocation.arrayFlags["--dedupe-key"] ?? []).last,
                 sound: invocation.flags["--sound"]
             )
 
@@ -125,14 +130,35 @@ enum CLIParser {
         case "list":
             code = Commands.list(
                 json: invocation.boolFlags.contains("--json"),
-                tags: invocation.arrayFlags["--tag"] ?? []
+                tags: invocation.arrayFlags["--tag"] ?? [],
+                sources: invocation.arrayFlags["--source"] ?? [],
+                sessions: invocation.arrayFlags["--session"] ?? [],
+                kinds: invocation.arrayFlags["--kind"] ?? [],
+                dedupeKeys: invocation.arrayFlags["--dedupe-key"] ?? []
             )
 
         case "count":
-            code = Commands.count(tags: invocation.arrayFlags["--tag"] ?? [])
+            code = Commands.count(
+                tags: invocation.arrayFlags["--tag"] ?? [],
+                sources: invocation.arrayFlags["--source"] ?? [],
+                sessions: invocation.arrayFlags["--session"] ?? [],
+                kinds: invocation.arrayFlags["--kind"] ?? [],
+                dedupeKeys: invocation.arrayFlags["--dedupe-key"] ?? []
+            )
 
         case "clear":
-            code = Commands.clear(tags: invocation.arrayFlags["--tag"] ?? [])
+            code = Commands.clear(
+                tags: invocation.arrayFlags["--tag"] ?? [],
+                sources: invocation.arrayFlags["--source"] ?? [],
+                sessions: invocation.arrayFlags["--session"] ?? [],
+                kinds: invocation.arrayFlags["--kind"] ?? [],
+                dedupeKeys: invocation.arrayFlags["--dedupe-key"] ?? []
+            )
+
+        case "doctor":
+            code = Commands.doctor(
+                json: invocation.boolFlags.contains("--json")
+            )
 
         case "version":
             code = Commands.version()

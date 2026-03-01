@@ -9,7 +9,7 @@ import Foundation
 /// - Creating the state directory if it doesn't exist
 /// - Writing new alert files
 /// - Reading individual alerts by ID
-/// - Listing all alerts (optionally filtered by group)
+/// - Listing all alerts (optionally filtered by tags/metadata)
 /// - Removing alert files
 /// - Counting alerts
 final class AlertStore {
@@ -93,8 +93,14 @@ final class AlertStore {
     }
 
     /// List all alerts, sorted by creation time (oldest first).
-    /// Optionally filter by tags (OR match — alert must have at least one of the given tags).
-    func list(tags: [String] = []) -> [Alert] {
+    /// Filters use OR within a dimension and AND across dimensions.
+    func list(
+        tags: [String] = [],
+        sources: [String] = [],
+        sessions: [String] = [],
+        kinds: [String] = [],
+        dedupeKeys: [String] = []
+    ) -> [Alert] {
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: alertsDir,
             includingPropertiesForKeys: nil
@@ -106,22 +112,45 @@ final class AlertStore {
                   let alert = try? decoder.decode(Alert.self, from: data) else { continue }
 
             if !tags.isEmpty, Set(tags).isDisjoint(with: Set(alert.tags)) { continue }
+            if !sources.isEmpty, !sources.contains(alert.source ?? "") { continue }
+            if !sessions.isEmpty, !sessions.contains(alert.session ?? "") { continue }
+            if !kinds.isEmpty, !kinds.contains(alert.kind ?? "") { continue }
+            if !dedupeKeys.isEmpty, !dedupeKeys.contains(alert.dedupeKey ?? "") { continue }
+
             alerts.append(alert)
         }
 
         return alerts.sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// Count alerts. Optionally filter by tags.
-    func count(tags: [String] = []) -> Int {
-        list(tags: tags).count
+    /// Count alerts using the same filter semantics as `list`.
+    func count(
+        tags: [String] = [],
+        sources: [String] = [],
+        sessions: [String] = [],
+        kinds: [String] = [],
+        dedupeKeys: [String] = []
+    ) -> Int {
+        list(tags: tags, sources: sources, sessions: sessions, kinds: kinds, dedupeKeys: dedupeKeys).count
     }
 
-    /// Remove all alerts. Optionally filter by tags.
+    /// Remove all matching alerts using the same filter semantics as `list`.
     /// Returns the removed alerts.
     @discardableResult
-    func clear(tags: [String] = []) -> [Alert] {
-        let alerts = list(tags: tags)
+    func clear(
+        tags: [String] = [],
+        sources: [String] = [],
+        sessions: [String] = [],
+        kinds: [String] = [],
+        dedupeKeys: [String] = []
+    ) -> [Alert] {
+        let alerts = list(
+            tags: tags,
+            sources: sources,
+            sessions: sessions,
+            kinds: kinds,
+            dedupeKeys: dedupeKeys
+        )
         for alert in alerts {
             remove(id: alert.id)
         }

@@ -76,23 +76,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             return
         }
 
-        // Execute on_click command if user clicked the notification body
-        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-            if let onClick = userInfo["on_click"] as? String, !onClick.isEmpty {
-                ShellHelper.execute(command: onClick)
-            }
-        }
+        let shouldRunOnClick = response.actionIdentifier == UNNotificationDefaultActionIdentifier
 
-        // Remove state file
-        let store = AlertStore()
-        store.remove(id: alertID)
-
-        // Remove notification from Notification Center
-        let nm = NotificationManager()
-        nm.remove(alertID: alertID)
-
-        // Trigger sketchybar update
-        ShellHelper.triggerSketchybar()
+        _ = Commands.done(
+            id: alertID,
+            run: shouldRunOnClick,
+            errorOutput: { _ in }
+        )
 
         // Notify the view model to refresh
         NotificationCenter.default.post(name: .alertsDidChange, object: nil)

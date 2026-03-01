@@ -1,8 +1,19 @@
+import AppKit
 import SwiftUI
 
 struct MenuBarContentView: View {
+    private enum TransitionState {
+        case menuOpen
+        case transitioningToSettings
+        case settingsOpen
+    }
+
     @Bindable var viewModel: AlertViewModel
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openSettings) private var openSettings
+    @State private var transitionState: TransitionState = .menuOpen
+    @State private var settingsTransitionWorkItem: DispatchWorkItem?
+    private let settingsTransitionFallbackDelay: TimeInterval = 0.2
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,10 +27,15 @@ struct MenuBarContentView: View {
         }
         .frame(width: 320)
         .onAppear {
+            transitionState = .menuOpen
+            cancelSettingsTransitionFallback()
             viewModel.startPolling()
         }
         .onDisappear {
             viewModel.stopPolling()
+            if transitionState == .transitioningToSettings {
+                openSettingsAfterMenuClose()
+            }
         }
     }
 
@@ -75,7 +91,7 @@ struct MenuBarContentView: View {
             }
 
             Button {
-                openSettings()
+                requestSettingsTransition()
             } label: {
                 HStack {
                     Text("Settings...")
@@ -96,6 +112,40 @@ struct MenuBarContentView: View {
             }
             .buttonStyle(HoverButtonStyle())
         }
+    }
+
+    private func requestSettingsTransition() {
+        guard transitionState == .menuOpen else { return }
+
+        transitionState = .transitioningToSettings
+        startSettingsTransitionFallback()
+
+        dismiss()
+        NSApp.keyWindow?.performClose(nil)
+    }
+
+    private func startSettingsTransitionFallback() {
+        cancelSettingsTransitionFallback()
+
+        let workItem = DispatchWorkItem {
+            openSettingsAfterMenuClose()
+        }
+
+        settingsTransitionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + settingsTransitionFallbackDelay, execute: workItem)
+    }
+
+    private func cancelSettingsTransitionFallback() {
+        settingsTransitionWorkItem?.cancel()
+        settingsTransitionWorkItem = nil
+    }
+
+    private func openSettingsAfterMenuClose() {
+        guard transitionState == .transitioningToSettings else { return }
+
+        cancelSettingsTransitionFallback()
+        transitionState = .settingsOpen
+        openSettings()
     }
 }
 

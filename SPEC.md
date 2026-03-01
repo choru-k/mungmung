@@ -25,19 +25,93 @@ A native macOS app that manages stateful notifications via CLI. No wrapper aroun
 Single binary embedded in the app bundle. Symlinked to PATH as `mung`.
 
 ```
-mung add     --title "..." --message "..." [--on-click "cmd"] [--icon "..."] [--tag "name" ...] [--sound "default"]
-mung list    [--json] [--tag "name" ...]
+mung add     --title "..." --message "..." [--on-click "cmd"] [--icon "..."] [--tag "name" ...]
+             [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."] [--sound "default"]
+mung list    [--json] [--tag "name" ...] [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."]
 mung done    <id> [--run]
-mung count   [--tag "name" ...]
-mung clear   [--tag "name" ...]
+mung count   [--tag "name" ...] [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."]
+mung clear   [--tag "name" ...] [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."]
+mung doctor  [--json]
 mung version
 mung help
 ```
+
+### Agent metadata contract v1
+
+For agent-oriented integrations (Pi, Claude, and future adapters), v1 defines first-class metadata flags.
+This is the primary contract for adapter implementations.
+
+```
+mung add     --title "..." --message "..." [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."]
+             [--on-click "cmd"] [--icon "..."] [--tag "name" ...] [--sound "default"]
+mung list    [--json] [--tag "name" ...] [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."]
+mung count   [--tag "name" ...] [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."]
+mung clear   [--tag "name" ...] [--source "..."] [--session "..."] [--kind "..."] [--dedupe-key "..."]
+```
+
+| Flag | Purpose | Example |
+|------|---------|---------|
+| `--source` | Adapter/source identity | `pi-agent`, `claude` |
+| `--session` | Session/run correlation key | `01HT...` |
+| `--kind` | Alert class (free-form, adapter-defined) | `update`, `action` |
+| `--dedupe-key` | Replace previous matching alert before add | `pi:update:$PI_SESSION_ID` |
+
+#### Metadata and filtering rules
+
+1. **Metadata is first-class:** agent adapters should set `--source`, `--session`, and `--kind` on `mung add`.
+2. **Metadata persistence:** `source`, `session`, and `kind` are persisted as dedicated alert fields.
+3. **Tags are optional labels:** `--tag` remains available for custom grouping, independent of metadata fields.
+4. **Filtering logic:**
+   - Repeated flags within one dimension are OR-matched.
+   - Different dimensions are AND-combined.
+   - Example: `--tag pi-agent --session abc --kind action`
+     means `(tag in {pi-agent}) AND (session == abc) AND (kind == action)`.
+5. **Dedupe semantics:**
+   - `--dedupe-key` replaces existing matching alerts before inserting the new alert.
+   - If `--session` is provided, replacement scope is limited to that session + dedupe key.
+   - Without `--session`, replacement scope is global to the dedupe key.
+6. **JSON output:** existing keys remain; metadata keys are included when present.
+
+### Adapter integration contract (Phase 4 kit)
+
+For Pi/Claude-style adapters, use this baseline for `mung add`:
+
+| Category | Fields/flags | Requirement |
+|---|---|---|
+| Core payload | `title`, `message` (`--title`, `--message`) | Required |
+| Adapter identity | `source` (`--source`) | Required |
+| Session identity | `session` (`--session`) | Required |
+| Event classification | `kind` (`--kind`) | Required |
+| Dedupe lane | `dedupe_key` (`--dedupe-key`) | Strongly recommended |
+| Action hook | `on_click` (`--on-click`) | Optional |
+| UX metadata | `icon`, `sound`, `tags` (`--icon`, `--sound`, `--tag`) | Optional |
+
+### Adapter lifecycle expectations
+
+Reference lifecycle mapping for agent adapters:
+
+| Adapter event | Recommended operation |
+|---|---|
+| Session start / agent start | `mung clear --source <adapter> --session <id>` |
+| Regular turn/update | `mung add ... --kind update --dedupe-key "<adapter>:update:<id>"` |
+| Confirmation needed | `mung add ... --kind action --dedupe-key "<adapter>:action:<id>"` |
+| Confirmation resolved | `mung clear --source <adapter> --session <id> --kind action` |
+| Session shutdown | `mung clear --source <adapter> --session <id>` |
+
+### Adapter upgrade notes
+
+For adapters that currently rely on tags only:
+1. Add first-class metadata fields (`source`, `session`, `kind`) on `add`.
+2. Introduce stable `dedupe_key` values for update/action alert lanes.
+3. Move cleanup/filtering calls to metadata filters (source/session/kind).
+4. Keep tags only for custom labels or UI grouping.
 
 ### Subcommand behavior
 
 **`mung add`** — Create alert + fire native notification
 - Generates unique ID
+- If `--dedupe-key` is set, removes previous matching alert(s) before save
+  - scoped by session when `--session` is provided
 - Writes state file to `$MUNG_DIR/alerts/<id>.json`
 - Sends macOS notification via `UNUserNotificationCenter`
 - Notification `userInfo` carries the alert ID + on_click command
@@ -52,15 +126,25 @@ mung help
 - Triggers sketchybar event
 - App exits after cleanup
 
-**`mung list [--json]`** — List pending alerts
+**`mung list [--json] [--tag ...] [--source ...] [--session ...] [--kind ...] [--dedupe-key ...]`** — List pending alerts
 - Reads all state files from `$MUNG_DIR/alerts/`
+- Supports tag and metadata filters (see v1 filtering rules above)
 - `--json`: output as JSON array
 - Default: human-readable table (ID, tags, icon, title, age)
 
-**`mung count`** — Print number of pending alerts
-- For sketchybar consumption
+**`mung count [--tag ...] [--source ...] [--session ...] [--kind ...] [--dedupe-key ...]`** — Print number of pending alerts
+- Applies the same filter semantics as `list`
+- For sketchybar or adapter consumption
 
-**`mung clear`** — Dismiss all (or by tag)
+**`mung clear [--tag ...] [--source ...] [--session ...] [--kind ...] [--dedupe-key ...]`** — Dismiss matching alerts
+- Applies the same filter semantics as `list`
+- No filters means clear all alerts
+
+**`mung doctor [--json]`** — Print runtime diagnostics
+- Reports executable/bundle context and notification availability
+- Reports current state directory, alerts directory status, and alert count
+- Reports resolved on_click shell context and debug flag status
+- `--json` emits a machine-readable diagnostics payload
 
 ## State
 
@@ -79,39 +163,73 @@ Alerts stored in `$MUNG_DIR/alerts/<id>.json`.
   "on_click": "aerospace workspace Terminal",
   "icon": "🤖",
   "tags": ["claude"],
+  "source": "claude",
+  "session": "cc-20260301-abc",
+  "kind": "update",
+  "dedupe_key": "claude:update:cc-20260301-abc",
   "sound": "default",
   "created_at": "2026-02-09T12:00:00Z"
 }
 ```
 
 Plain JSON. Any tool can read/write these files.
+`source`, `session`, `kind`, and `dedupe_key` are optional metadata fields.
 
 ## App architecture
 
-### Swift, headless macOS app
+### Swift macOS app (CLI + menu bar)
 
-- `LSUIElement = true` (no Dock icon, no menu bar)
+- `LSUIElement = true` (no Dock icon; app lives in menu bar)
 - Entry point detects subcommand from `CommandLine.arguments`
-- Two modes:
+- Modes:
   1. **CLI mode** — `add`, `done`, `list`, `count`, `clear`, `help`, `version`
-  2. **Notification callback mode** — launched by macOS when user clicks a notification
+  2. **Menu bar mode** — no CLI subcommand, run SwiftUI menu bar app
+  3. **Notification callback path** — click delivered via notification delegate
 
 ### Lifecycle: launch on demand
 
 - App launches per CLI call, does its work, exits
-- When user clicks a notification, **macOS relaunches** the app automatically
-- `AppDelegate.applicationDidFinishLaunching` checks `launchUserNotificationUserInfoKey` for click data
-- On click: reads `on_click` from `userInfo`, executes it, calls `mung done <id>`, exits
+- When user clicks a notification, **macOS relaunches** the app automatically if needed
+- The app registers `UNUserNotificationCenterDelegate` and handles clicks in `didReceive`
+- Click path reuses `Commands.done(id: ..., run: ...)` for consistent behavior
 - No daemon, no background process, no LaunchAgent
 
 ### Notification click handling
 
-macOS delivers the click to `UNUserNotificationCenterDelegate.didReceive`:
-1. Extract alert ID + on_click from notification's `userInfo`
-2. Run `on_click` command (via `Process` / shell)
-3. Remove state file
-4. Trigger sketchybar event
-5. Exit
+macOS delivers the click to `UNUserNotificationCenterDelegate.didReceive`.
+Click handling reuses the same command path as CLI dismissal:
+1. Extract alert ID from notification `userInfo`
+2. Determine `run` (`true` for default body click)
+3. Delegate to `Commands.done(id: ..., run: ...)`
+4. `Commands.done` performs state removal, notification cleanup, optional `on_click`, and sketchybar trigger
+
+### on_click execution context
+
+When `on_click` executes, shell context resolution is:
+1. `$MUNG_ON_CLICK_SHELL` (if executable)
+2. `$SHELL` (if executable)
+3. fallback `/bin/sh`
+
+Controls:
+- `$MUNG_ON_CLICK_CWD` — set working directory for action execution (must exist)
+- `$MUNG_DEBUG_ACTIONS=1` — print action/sketchybar execution failures to stderr
+- `$MUNG_DEBUG_LIFECYCLE=1` — print add/done/clear lifecycle diagnostics to stderr
+
+### Platform behavior matrix (mung-notify reference focus script)
+
+The matrix below describes known focus behavior tiers from the Pi `mung-notify` adapter (`scripts/mung-focus.sh`).
+This is adapter-level behavior, not a universal mung core guarantee.
+
+| Runtime combination | Tier | Guarantee summary |
+|---|---|---|
+| WezTerm | exact | Deterministic return via WezTerm pane ID |
+| WezTerm + tmux | exact | Deterministic WezTerm + tmux targeting |
+| WezTerm + zellij | exact | Deterministic WezTerm + zellij targeting |
+| Ghostty | app_only | Foreground Ghostty app only |
+| Ghostty (single tab) + tmux | practical_exact | Deterministic if single-tab invariant holds |
+| Ghostty (single tab) + zellij | practical_exact | Deterministic if single-tab invariant holds |
+| Ghostty (multi tab) + tmux | best_effort | tmux context targeted; exact Ghostty tab not guaranteed |
+| Ghostty (multi tab) + zellij | best_effort | zellij context targeted; exact Ghostty tab not guaranteed |
 
 ### Notification features (native UNUserNotificationCenter)
 
@@ -157,14 +275,21 @@ Example plugin lives in `examples/sketchybar-plugin.sh`. User's actual plugin li
 # Generic notification
 mung add --title "Build" --message "Deploy ready" --on-click "open https://github.com"
 
-# Claude Code hook (in settings.json)
-mung add --title "Claude Code" --message "Waiting: ${CLAUDE_PROJECT_DIR##*/}" \
-  --tag claude --icon "🤖" --sound default \
-  --on-click "aerospace workspace Terminal"
+# Pi adapter task update (replace prior session update)
+mung add --title "Pi task update" --message "Pi finished this turn" \
+  --source pi-agent --session "$PI_SESSION_ID" --kind update \
+  --dedupe-key "pi:update:$PI_SESSION_ID" \
+  --icon "🦴" --sound default \
+  --on-click "bash -lc '~/.pi/agent/extensions/mung-notify/scripts/mung-focus.sh ...'"
 
-# Check alerts
-mung list
-mung count
+# Claude adapter confirmation-needed alert
+mung add --title "Pi needs your confirmation" --message "Agent asks for input" \
+  --source claude --session "$CLAUDE_SESSION_ID" --kind action \
+  --icon "🤖" --sound default
+
+# Query by metadata (new) or by tags (existing)
+mung list --session "$PI_SESSION_ID" --kind update --json
+mung count --tag pi-needs-action
 
 # Dismiss from CLI
 mung done 1738000000_a1b2c3d4
@@ -172,14 +297,27 @@ mung done 1738000000_a1b2c3d4
 # Dismiss + run action from CLI
 mung done 1738000000_a1b2c3d4 --run
 
-# Clear all claude alerts
-mung clear --tag claude
+# Session-scoped cleanup
+mung clear --source pi-agent --session "$PI_SESSION_ID"
+
+# Runtime diagnostics
+mung doctor
+mung doctor --json
 ```
+
+## Release hardening verification
+
+Recommended pre-release checks:
+1. `swift test`
+2. `swift build -c release`
+3. `.build/release/MungMung doctor --json`
+4. `make verify-release`
+5. Validate reference integration flows from `Tests/MungMungTests/CLIIntegrationTests.swift`.
 
 ## What's NOT in scope
 
-- No GUI preferences window
-- No menu bar icon (that's sketchybar's job)
-- No built-in terminal/zellij/tmux logic (on_click is user-defined)
-- No network/remote notifications
+- No full Dock-based primary window workflow (menu bar utility app only)
+- No built-in terminal/zellij/tmux targeting logic in core (`on_click` remains user/adapter-defined)
+- No network/remote notification relay
+- No cross-device sync
 - No notification history/persistence after done

@@ -35,4 +35,33 @@ final class NotificationManagerTests: XCTestCase {
         let path = "/Users/dev/Custom.app/Contents/MacOS/tool"
         XCTAssertTrue(NotificationManager.isBundledExecutable(resolvedPath: path))
     }
+
+    // MARK: - canUseNotificationCenter
+
+    func testCanUseNotificationCenter_bundleIdentifierPresent_returnsTrue() {
+        let canUse = NotificationManager.canUseNotificationCenter(
+            bundleIdentifier: "dev.choru.mungmung",
+            executablePath: "/Users/dev/project/.build/debug/MungMung"
+        )
+
+        XCTAssertTrue(canUse)
+    }
+
+    func testCanUseNotificationCenter_bundleIdentifierMissingButAppBundlePath_returnsTrue() {
+        let canUse = NotificationManager.canUseNotificationCenter(
+            bundleIdentifier: nil,
+            executablePath: "/Applications/MungMung.app/Contents/MacOS/MungMung"
+        )
+
+        XCTAssertTrue(canUse)
+    }
+
+    func testCanUseNotificationCenter_bundleIdentifierMissingAndNonBundlePath_returnsFalse() {
+        let canUse = NotificationManager.canUseNotificationCenter(
+            bundleIdentifier: nil,
+            executablePath: "/Users/dev/project/.build/debug/MungMung"
+        )
+
+        XCTAssertFalse(canUse)
+    }
 }

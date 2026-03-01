@@ -88,6 +88,31 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertTrue(result.stdout.contains("mung"))
     }
 
+    // MARK: - doctor
+
+    func testDoctorExitsZeroAndContainsRuntimeInfo() {
+        let result = run("doctor")
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stdout.contains("mung doctor"))
+        XCTAssertTrue(result.stdout.contains("notifications_available:"))
+        XCTAssertTrue(result.stdout.contains("mung_dir: \(tempDir.path)"))
+        XCTAssertTrue(result.stdout.contains("alert_count:"))
+    }
+
+    func testDoctorJSONOutputsValidJSON() {
+        let result = run("doctor", "--json")
+
+        XCTAssertEqual(result.exitCode, 0)
+
+        let data = result.stdout.data(using: .utf8)!
+        let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertNotNil(parsed)
+
+        let state = parsed?["state"] as? [String: Any]
+        XCTAssertEqual(state?["mungDir"] as? String, tempDir.path)
+    }
+
     // MARK: - add
 
     func testAddPrintsIDAndExitsZero() {
@@ -124,6 +149,82 @@ final class CLIIntegrationTests: XCTestCase {
         let listResult = run("list", "--json")
         XCTAssertTrue(listResult.stdout.contains("ci"))
         XCTAssertTrue(listResult.stdout.contains("deploy"))
+    }
+
+    func testAddWithMetadataFields() {
+        let result = run(
+            "add",
+            "--title", "Meta",
+            "--message", "Payload",
+            "--source", "pi-agent",
+            "--session", "sess-1",
+            "--kind", "update"
+        )
+        XCTAssertEqual(result.exitCode, 0)
+
+        let listResult = run("list", "--json")
+        let data = listResult.stdout.data(using: .utf8)!
+        let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        let first = parsed?.first
+
+        XCTAssertEqual(first?["source"] as? String, "pi-agent")
+        XCTAssertEqual(first?["session"] as? String, "sess-1")
+        XCTAssertEqual(first?["kind"] as? String, "update")
+    }
+
+    func testAddWithDedupeKey_replacesWithinSession() {
+        _ = run(
+            "add",
+            "--title", "First",
+            "--message", "One",
+            "--source", "pi-agent",
+            "--session", "s1",
+            "--kind", "update",
+            "--dedupe-key", "pi:update"
+        )
+
+        _ = run(
+            "add",
+            "--title", "Second",
+            "--message", "Two",
+            "--source", "pi-agent",
+            "--session", "s1",
+            "--kind", "update",
+            "--dedupe-key", "pi:update"
+        )
+
+        let listResult = run("list", "--json", "--session", "s1", "--dedupe-key", "pi:update")
+        let data = listResult.stdout.data(using: .utf8)!
+        let array = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(array.count, 1)
+        XCTAssertEqual(array.first?["title"] as? String, "Second")
+    }
+
+    func testAddWithDedupeKey_keepsDifferentSessionsIsolated() {
+        _ = run(
+            "add",
+            "--title", "SessionOne",
+            "--message", "One",
+            "--source", "pi-agent",
+            "--session", "s1",
+            "--kind", "update",
+            "--dedupe-key", "pi:update"
+        )
+
+        _ = run(
+            "add",
+            "--title", "SessionTwo",
+            "--message", "Two",
+            "--source", "pi-agent",
+            "--session", "s2",
+            "--kind", "update",
+            "--dedupe-key", "pi:update"
+        )
+
+        let listResult = run("list", "--json", "--dedupe-key", "pi:update")
+        let data = listResult.stdout.data(using: .utf8)!
+        let array = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(array.count, 2)
     }
 
     // MARK: - list
@@ -165,6 +266,29 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertFalse(result.stdout.contains("B"))
     }
 
+    func testListMetadataFilter() {
+        run("add", "--title", "A", "--message", "M", "--source", "pi-agent", "--session", "s1", "--kind", "update")
+        run("add", "--title", "B", "--message", "M", "--source", "pi-agent", "--session", "s1", "--kind", "action")
+        run("add", "--title", "C", "--message", "M", "--source", "claude", "--session", "s1", "--kind", "update")
+
+        let result = run("list", "--json", "--source", "pi-agent", "--kind", "update")
+        let data = result.stdout.data(using: .utf8)!
+        let array = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(array.count, 1)
+        XCTAssertEqual(array.first?["title"] as? String, "A")
+    }
+
+    func testListDedupeKeyFilter() {
+        run("add", "--title", "A", "--message", "M", "--dedupe-key", "k1")
+        run("add", "--title", "B", "--message", "M", "--dedupe-key", "k2")
+
+        let result = run("list", "--json", "--dedupe-key", "k1")
+        let data = result.stdout.data(using: .utf8)!
+        let array = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        XCTAssertEqual(array.count, 1)
+        XCTAssertEqual(array.first?["title"] as? String, "A")
+    }
+
     // MARK: - count
 
     func testCountEmptyIsZero() {
@@ -187,6 +311,24 @@ final class CLIIntegrationTests: XCTestCase {
 
         let result = run("count", "--tag", "work")
         XCTAssertTrue(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
+    }
+
+    func testCountMetadataFilter() {
+        run("add", "--title", "A", "--message", "M", "--source", "pi-agent", "--session", "s1")
+        run("add", "--title", "B", "--message", "M", "--source", "pi-agent", "--session", "s2")
+        run("add", "--title", "C", "--message", "M", "--source", "claude", "--session", "s1")
+
+        let result = run("count", "--source", "pi-agent", "--session", "s1")
+        XCTAssertTrue(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
+    }
+
+    func testCountDedupeKeyFilter() {
+        run("add", "--title", "A", "--message", "M", "--session", "s1", "--dedupe-key", "k1")
+        run("add", "--title", "B", "--message", "M", "--session", "s2", "--dedupe-key", "k1")
+        run("add", "--title", "C", "--message", "M", "--dedupe-key", "k2")
+
+        let result = run("count", "--dedupe-key", "k1")
+        XCTAssertTrue(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "2")
     }
 
     // MARK: - done
@@ -238,6 +380,40 @@ final class CLIIntegrationTests: XCTestCase {
         XCTAssertTrue(countResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
     }
 
+    func testClearByMetadata() {
+        run("add", "--title", "A", "--message", "M", "--source", "pi-agent", "--kind", "update")
+        run("add", "--title", "B", "--message", "M", "--source", "pi-agent", "--kind", "action")
+        run("add", "--title", "C", "--message", "M", "--source", "claude", "--kind", "update")
+
+        let result = run("clear", "--source", "pi-agent", "--kind", "update")
+        XCTAssertTrue(result.stdout.contains("1 alert"))
+
+        let listResult = run("list", "--json")
+        let data = listResult.stdout.data(using: .utf8)!
+        let array = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        let titles = Set(array.compactMap { $0["title"] as? String })
+
+        XCTAssertFalse(titles.contains("A"))
+        XCTAssertTrue(titles.contains("B"))
+        XCTAssertTrue(titles.contains("C"))
+    }
+
+    func testClearByDedupeKey() {
+        run("add", "--title", "A", "--message", "M", "--session", "s1", "--dedupe-key", "k1")
+        run("add", "--title", "B", "--message", "M", "--dedupe-key", "k2")
+        run("add", "--title", "C", "--message", "M", "--session", "s2", "--dedupe-key", "k1")
+
+        let result = run("clear", "--dedupe-key", "k1")
+        XCTAssertTrue(result.stdout.contains("2 alerts"))
+
+        let listResult = run("list", "--json")
+        let data = listResult.stdout.data(using: .utf8)!
+        let array = try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        let titles = Set(array.compactMap { $0["title"] as? String })
+
+        XCTAssertEqual(titles, Set(["B"]))
+    }
+
     // MARK: - lifecycle
 
     func testFullLifecycle() {
@@ -261,6 +437,129 @@ final class CLIIntegrationTests: XCTestCase {
         // Count — should be 0
         let finalCount = run("count")
         XCTAssertEqual(finalCount.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "0")
+    }
+
+    func testReferenceFlow_piAdapter_updateAndActionLanes() {
+        let sessionID = "pi-session-1"
+
+        run(
+            "add",
+            "--title", "Pi update 1",
+            "--message", "First update",
+            "--source", "pi-agent",
+            "--session", sessionID,
+            "--kind", "update",
+            "--dedupe-key", "pi:update:\(sessionID)"
+        )
+
+        run(
+            "add",
+            "--title", "Pi update 2",
+            "--message", "Second update",
+            "--source", "pi-agent",
+            "--session", sessionID,
+            "--kind", "update",
+            "--dedupe-key", "pi:update:\(sessionID)"
+        )
+
+        run(
+            "add",
+            "--title", "Pi action 1",
+            "--message", "Need confirmation",
+            "--source", "pi-agent",
+            "--session", sessionID,
+            "--kind", "action",
+            "--dedupe-key", "pi:action:\(sessionID)"
+        )
+
+        run(
+            "add",
+            "--title", "Pi action 2",
+            "--message", "Need confirmation again",
+            "--source", "pi-agent",
+            "--session", sessionID,
+            "--kind", "action",
+            "--dedupe-key", "pi:action:\(sessionID)"
+        )
+
+        let countBeforeCleanup = run("count", "--source", "pi-agent", "--session", sessionID)
+        XCTAssertEqual(countBeforeCleanup.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "2")
+
+        let clearActions = run("clear", "--source", "pi-agent", "--session", sessionID, "--kind", "action")
+        XCTAssertEqual(clearActions.exitCode, 0)
+        XCTAssertTrue(clearActions.stdout.contains("1 alert"))
+
+        let countAfterCleanup = run("count", "--source", "pi-agent", "--session", sessionID)
+        XCTAssertEqual(countAfterCleanup.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "1")
+
+        let listUpdates = run(
+            "list",
+            "--json",
+            "--source", "pi-agent",
+            "--session", sessionID,
+            "--kind", "update",
+            "--dedupe-key", "pi:update:\(sessionID)"
+        )
+        let updateData = listUpdates.stdout.data(using: .utf8)!
+        let updates = try! JSONSerialization.jsonObject(with: updateData) as! [[String: Any]]
+
+        XCTAssertEqual(updates.count, 1)
+        XCTAssertEqual(updates.first?["title"] as? String, "Pi update 2")
+
+        let listActions = run("list", "--json", "--source", "pi-agent", "--session", sessionID, "--kind", "action")
+        let actionData = listActions.stdout.data(using: .utf8)!
+        let actions = try! JSONSerialization.jsonObject(with: actionData) as! [[String: Any]]
+        XCTAssertEqual(actions.count, 0)
+    }
+
+    func testReferenceFlow_claudeAdapter_sessionIsolation() {
+        run(
+            "add",
+            "--title", "Claude action",
+            "--message", "Need input",
+            "--source", "claude",
+            "--session", "claude-a",
+            "--kind", "action",
+            "--dedupe-key", "claude:action:claude-a"
+        )
+
+        run(
+            "add",
+            "--title", "Claude update A",
+            "--message", "Turn finished",
+            "--source", "claude",
+            "--session", "claude-a",
+            "--kind", "update",
+            "--dedupe-key", "claude:update:claude-a"
+        )
+
+        run(
+            "add",
+            "--title", "Claude update B",
+            "--message", "Other session",
+            "--source", "claude",
+            "--session", "claude-b",
+            "--kind", "update",
+            "--dedupe-key", "claude:update:claude-b"
+        )
+
+        let clearSessionA = run("clear", "--source", "claude", "--session", "claude-a")
+        XCTAssertEqual(clearSessionA.exitCode, 0)
+        XCTAssertTrue(clearSessionA.stdout.contains("2 alerts"))
+
+        let sessionACount = run("count", "--source", "claude", "--session", "claude-a")
+        XCTAssertEqual(sessionACount.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "0")
+
+        let sessionBCount = run("count", "--source", "claude", "--session", "claude-b")
+        XCTAssertEqual(sessionBCount.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "1")
+
+        let remaining = run("list", "--json", "--source", "claude", "--session", "claude-b")
+        let remainingData = remaining.stdout.data(using: .utf8)!
+        let parsed = try! JSONSerialization.jsonObject(with: remainingData) as! [[String: Any]]
+
+        XCTAssertEqual(parsed.count, 1)
+        XCTAssertEqual(parsed.first?["title"] as? String, "Claude update B")
+        XCTAssertEqual(parsed.first?["kind"] as? String, "update")
     }
 
     // MARK: - unknown command

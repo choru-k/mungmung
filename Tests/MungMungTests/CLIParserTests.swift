@@ -25,6 +25,12 @@ final class CLIParserTests: XCTestCase {
         XCTAssertTrue(inv.arrayFlags.isEmpty)
     }
 
+    func testDoctorWithJSONFlag() {
+        let inv = CLIParser.parse(["doctor", "--json"])
+        XCTAssertEqual(inv.subcommand, "doctor")
+        XCTAssertTrue(inv.boolFlags.contains("--json"))
+    }
+
     func testSubcommandIsLowercased() {
         let inv = CLIParser.parse(["ADD"])
         XCTAssertEqual(inv.subcommand, "add")
@@ -78,6 +84,34 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(inv.arrayFlags["--tag"], ["ci", "deploy"])
     }
 
+    func testMetadataFlagsParseAsArrayFlags() {
+        let inv = CLIParser.parse([
+            "add", "--title", "T", "--message", "M",
+            "--source", "pi-agent",
+            "--session", "sess-1",
+            "--kind", "update",
+            "--dedupe-key", "pi:update:sess-1"
+        ])
+        XCTAssertEqual(inv.arrayFlags["--source"], ["pi-agent"])
+        XCTAssertEqual(inv.arrayFlags["--session"], ["sess-1"])
+        XCTAssertEqual(inv.arrayFlags["--kind"], ["update"])
+        XCTAssertEqual(inv.arrayFlags["--dedupe-key"], ["pi:update:sess-1"])
+    }
+
+    func testRepeatedMetadataFlagsAccumulate() {
+        let inv = CLIParser.parse([
+            "list",
+            "--source", "pi-agent", "--source", "claude",
+            "--session", "s1", "--session", "s2",
+            "--kind", "update", "--kind", "action",
+            "--dedupe-key", "k1", "--dedupe-key", "k2"
+        ])
+        XCTAssertEqual(inv.arrayFlags["--source"], ["pi-agent", "claude"])
+        XCTAssertEqual(inv.arrayFlags["--session"], ["s1", "s2"])
+        XCTAssertEqual(inv.arrayFlags["--kind"], ["update", "action"])
+        XCTAssertEqual(inv.arrayFlags["--dedupe-key"], ["k1", "k2"])
+    }
+
     func testTagNotInValuedFlags() {
         let inv = CLIParser.parse(["add", "--title", "T", "--message", "M", "--tag", "ci"])
         XCTAssertNil(inv.flags["--tag"], "--tag should not appear in valued flags")
@@ -88,6 +122,22 @@ final class CLIParserTests: XCTestCase {
         XCTAssertEqual(inv.subcommand, "list")
         XCTAssertTrue(inv.boolFlags.contains("--json"))
         XCTAssertEqual(inv.arrayFlags["--tag"], ["ci"])
+    }
+
+    func testListWithMetadataFilters() {
+        let inv = CLIParser.parse([
+            "list", "--json",
+            "--source", "pi-agent",
+            "--session", "sess-1",
+            "--kind", "action",
+            "--dedupe-key", "k1"
+        ])
+        XCTAssertEqual(inv.subcommand, "list")
+        XCTAssertTrue(inv.boolFlags.contains("--json"))
+        XCTAssertEqual(inv.arrayFlags["--source"], ["pi-agent"])
+        XCTAssertEqual(inv.arrayFlags["--session"], ["sess-1"])
+        XCTAssertEqual(inv.arrayFlags["--kind"], ["action"])
+        XCTAssertEqual(inv.arrayFlags["--dedupe-key"], ["k1"])
     }
 
     // MARK: - Boolean Flags

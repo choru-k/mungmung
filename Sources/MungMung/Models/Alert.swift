@@ -13,7 +13,11 @@ import Foundation
 ///   "message": "Waiting for input",
 ///   "on_click": "aerospace workspace Terminal",
 ///   "icon": "🤖",
-///   "group": "claude",
+///   "tags": ["claude"],
+///   "source": "claude",
+///   "session": "cc-20260301-abc",
+///   "kind": "update",
+///   "dedupe_key": "pi:update:cc-20260301-abc",
 ///   "sound": "default",
 ///   "created_at": "2026-02-09T12:00:00Z"
 /// }
@@ -25,15 +29,21 @@ struct Alert: Codable, Identifiable, Hashable {
     var onClick: String?
     var icon: String?
     var tags: [String]
+    var source: String?
+    var session: String?
+    var kind: String?
+    var dedupeKey: String?
     var sound: String?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id, title, message
         case onClick = "on_click"
-        case icon, tags, sound
+        case icon, tags
+        case source, session, kind
+        case dedupeKey = "dedupe_key"
+        case sound
         case createdAt = "created_at"
-        case group  // backward-compat decoding only
     }
 
     init(from decoder: Decoder) throws {
@@ -43,17 +53,13 @@ struct Alert: Codable, Identifiable, Hashable {
         message = try container.decode(String.self, forKey: .message)
         onClick = try container.decodeIfPresent(String.self, forKey: .onClick)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        session = try container.decodeIfPresent(String.self, forKey: .session)
+        kind = try container.decodeIfPresent(String.self, forKey: .kind)
+        dedupeKey = try container.decodeIfPresent(String.self, forKey: .dedupeKey)
         sound = try container.decodeIfPresent(String.self, forKey: .sound)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
-
-        // Try "tags" first, fall back to legacy "group" key
-        if let decoded = try container.decodeIfPresent([String].self, forKey: .tags) {
-            tags = decoded
-        } else if let group = try container.decodeIfPresent(String.self, forKey: .group) {
-            tags = [group]
-        } else {
-            tags = []
-        }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -64,6 +70,10 @@ struct Alert: Codable, Identifiable, Hashable {
         try container.encodeIfPresent(onClick, forKey: .onClick)
         try container.encodeIfPresent(icon, forKey: .icon)
         try container.encode(tags, forKey: .tags)
+        try container.encodeIfPresent(source, forKey: .source)
+        try container.encodeIfPresent(session, forKey: .session)
+        try container.encodeIfPresent(kind, forKey: .kind)
+        try container.encodeIfPresent(dedupeKey, forKey: .dedupeKey)
         try container.encodeIfPresent(sound, forKey: .sound)
         try container.encode(createdAt, forKey: .createdAt)
     }
@@ -85,6 +95,10 @@ struct Alert: Codable, Identifiable, Hashable {
         onClick: String? = nil,
         icon: String? = nil,
         tags: [String] = [],
+        source: String? = nil,
+        session: String? = nil,
+        kind: String? = nil,
+        dedupeKey: String? = nil,
         sound: String? = nil
     ) {
         self.id = Alert.generateID()
@@ -93,6 +107,10 @@ struct Alert: Codable, Identifiable, Hashable {
         self.onClick = onClick
         self.icon = icon
         self.tags = tags
+        self.source = source
+        self.session = session
+        self.kind = kind
+        self.dedupeKey = dedupeKey
         self.sound = sound
         self.createdAt = Date()
     }

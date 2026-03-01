@@ -153,6 +153,40 @@ final class AlertStoreTests: XCTestCase {
         XCTAssertTrue(titles.contains("Both"))
     }
 
+    func testList_sourceORFilter() throws {
+        try store.save(Alert(title: "A", message: "M", source: "pi-agent"))
+        try store.save(Alert(title: "B", message: "M", source: "claude"))
+        try store.save(Alert(title: "C", message: "M", source: "other"))
+
+        let filtered = store.list(sources: ["pi-agent", "claude"])
+        XCTAssertEqual(filtered.count, 2)
+        let titles = Set(filtered.map { $0.title })
+        XCTAssertTrue(titles.contains("A"))
+        XCTAssertTrue(titles.contains("B"))
+    }
+
+    func testList_dedupeKeyFilter() throws {
+        try store.save(Alert(title: "A", message: "M", dedupeKey: "k1"))
+        try store.save(Alert(title: "B", message: "M", dedupeKey: "k2"))
+        try store.save(Alert(title: "C", message: "M", dedupeKey: "k1"))
+
+        let filtered = store.list(dedupeKeys: ["k1"])
+        XCTAssertEqual(filtered.count, 2)
+        let titles = Set(filtered.map { $0.title })
+        XCTAssertTrue(titles.contains("A"))
+        XCTAssertTrue(titles.contains("C"))
+    }
+
+    func testList_filtersUseANDAcrossDimensions() throws {
+        try store.save(Alert(title: "A", message: "M", tags: ["work"], source: "pi-agent", session: "s1", kind: "update"))
+        try store.save(Alert(title: "B", message: "M", tags: ["work"], source: "pi-agent", session: "s1", kind: "action"))
+        try store.save(Alert(title: "C", message: "M", tags: ["work"], source: "claude", session: "s1", kind: "update"))
+
+        let filtered = store.list(tags: ["work"], sources: ["pi-agent"], sessions: ["s1"], kinds: ["update"])
+        XCTAssertEqual(filtered.count, 1)
+        XCTAssertEqual(filtered.first?.title, "A")
+    }
+
     // MARK: - Count
 
     func testCount_empty() {
@@ -173,6 +207,25 @@ final class AlertStoreTests: XCTestCase {
         XCTAssertEqual(store.count(tags: ["ci"]), 2)
         XCTAssertEqual(store.count(tags: ["dev"]), 1)
         XCTAssertEqual(store.count(), 3)
+    }
+
+    func testCount_filteredByMetadata() throws {
+        try store.save(Alert(title: "A", message: "M", source: "pi-agent", session: "s1"))
+        try store.save(Alert(title: "B", message: "M", source: "pi-agent", session: "s2"))
+        try store.save(Alert(title: "C", message: "M", source: "claude", session: "s1"))
+
+        XCTAssertEqual(store.count(sources: ["pi-agent"]), 2)
+        XCTAssertEqual(store.count(sources: ["pi-agent"], sessions: ["s1"]), 1)
+        XCTAssertEqual(store.count(kinds: ["update"]), 0)
+    }
+
+    func testCount_filteredByDedupeKey() throws {
+        try store.save(Alert(title: "A", message: "M", dedupeKey: "k1"))
+        try store.save(Alert(title: "B", message: "M", dedupeKey: "k2"))
+        try store.save(Alert(title: "C", message: "M", dedupeKey: "k1"))
+
+        XCTAssertEqual(store.count(dedupeKeys: ["k1"]), 2)
+        XCTAssertEqual(store.count(dedupeKeys: ["k2"]), 1)
     }
 
     // MARK: - Clear
@@ -211,6 +264,28 @@ final class AlertStoreTests: XCTestCase {
         let removed = store.clear(tags: ["nonexistent"])
         XCTAssertTrue(removed.isEmpty)
         XCTAssertEqual(store.count(), 1)
+    }
+
+    func testClear_byMetadata_onlyRemovesMatching() throws {
+        try store.save(Alert(title: "A", message: "M", source: "pi-agent", kind: "update"))
+        try store.save(Alert(title: "B", message: "M", source: "pi-agent", kind: "action"))
+        try store.save(Alert(title: "C", message: "M", source: "claude", kind: "update"))
+
+        let removed = store.clear(sources: ["pi-agent"], kinds: ["update"])
+        XCTAssertEqual(removed.count, 1)
+        XCTAssertEqual(removed.first?.title, "A")
+        XCTAssertEqual(store.count(), 2)
+    }
+
+    func testClear_byDedupeKey_onlyRemovesMatching() throws {
+        try store.save(Alert(title: "A", message: "M", dedupeKey: "k1"))
+        try store.save(Alert(title: "B", message: "M", dedupeKey: "k2"))
+        try store.save(Alert(title: "C", message: "M", dedupeKey: "k1"))
+
+        let removed = store.clear(dedupeKeys: ["k1"])
+        XCTAssertEqual(removed.count, 2)
+        XCTAssertEqual(store.count(), 1)
+        XCTAssertEqual(store.list().first?.title, "B")
     }
 
     // MARK: - Helpers

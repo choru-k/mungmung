@@ -12,22 +12,32 @@ import UserNotifications
 final class NotificationManager: NotificationSending {
 
     private var center: UNUserNotificationCenter? = {
-        if Bundle.main.bundleIdentifier != nil {
-            return UNUserNotificationCenter.current()
-        }
-        // When launched via symlink (e.g. /opt/homebrew/bin/mung),
-        // Bundle.main doesn't resolve to the .app bundle.
-        // Resolve the real executable path to check if we're inside one.
-        let resolvedPath = URL(
-            fileURLWithPath: ProcessInfo.processInfo.arguments[0]
-        ).resolvingSymlinksInPath().path
-        guard NotificationManager.isBundledExecutable(resolvedPath: resolvedPath) else { return nil }
+        guard NotificationManager.canUseNotificationCenter() else { return nil }
         return UNUserNotificationCenter.current()
     }()
 
     /// Returns `true` when the resolved executable path is inside a `.app` bundle.
     static func isBundledExecutable(resolvedPath: String) -> Bool {
         resolvedPath.contains(".app/Contents/MacOS/")
+    }
+
+    /// Determines whether notification APIs are expected to work in this process.
+    ///
+    /// Notification center is available when:
+    /// - The process has a bundle identifier, OR
+    /// - The executable resolves inside an app bundle path.
+    static func canUseNotificationCenter(
+        bundleIdentifier: String? = Bundle.main.bundleIdentifier,
+        executablePath: String = ProcessInfo.processInfo.arguments[0]
+    ) -> Bool {
+        if bundleIdentifier != nil {
+            return true
+        }
+
+        let resolvedPath = URL(fileURLWithPath: executablePath)
+            .resolvingSymlinksInPath()
+            .path
+        return isBundledExecutable(resolvedPath: resolvedPath)
     }
 
     // MARK: - Permission
@@ -41,7 +51,11 @@ final class NotificationManager: NotificationSending {
     func requestPermission() -> Bool {
         guard let center = center else { return false }
 
-        var authorized = false
+        final class PermissionResult: @unchecked Sendable {
+            var authorized = false
+        }
+
+        let result = PermissionResult()
         let semaphore = DispatchSemaphore(value: 0)
 
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
@@ -50,12 +64,12 @@ final class NotificationManager: NotificationSending {
                     Data("mung: notification permission error: \(error.localizedDescription)\n".utf8)
                 )
             }
-            authorized = granted
+            result.authorized = granted
             semaphore.signal()
         }
 
         semaphore.wait()
-        return authorized
+        return result.authorized
     }
 
     // MARK: - Send Notification

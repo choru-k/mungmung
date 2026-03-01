@@ -44,6 +44,10 @@ final class AlertTests: XCTestCase {
         XCTAssertNil(alert.onClick)
         XCTAssertNil(alert.icon)
         XCTAssertTrue(alert.tags.isEmpty)
+        XCTAssertNil(alert.source)
+        XCTAssertNil(alert.session)
+        XCTAssertNil(alert.kind)
+        XCTAssertNil(alert.dedupeKey)
         XCTAssertNil(alert.sound)
     }
 
@@ -51,11 +55,20 @@ final class AlertTests: XCTestCase {
         let alert = Alert(
             title: "T", message: "M",
             onClick: "open .", icon: "🔔",
-            tags: ["ci"], sound: "default"
+            tags: ["ci"],
+            source: "pi-agent",
+            session: "sess-1",
+            kind: "update",
+            dedupeKey: "pi:update:sess-1",
+            sound: "default"
         )
         XCTAssertEqual(alert.onClick, "open .")
         XCTAssertEqual(alert.icon, "🔔")
         XCTAssertEqual(alert.tags, ["ci"])
+        XCTAssertEqual(alert.source, "pi-agent")
+        XCTAssertEqual(alert.session, "sess-1")
+        XCTAssertEqual(alert.kind, "update")
+        XCTAssertEqual(alert.dedupeKey, "pi:update:sess-1")
         XCTAssertEqual(alert.sound, "default")
     }
 
@@ -70,7 +83,12 @@ final class AlertTests: XCTestCase {
         let original = Alert(
             title: "Claude Code", message: "Waiting for input",
             onClick: "aerospace workspace Terminal",
-            icon: "🤖", tags: ["claude"], sound: "default"
+            icon: "🤖", tags: ["claude"],
+            source: "claude",
+            session: "cc-123",
+            kind: "update",
+            dedupeKey: "claude:update:cc-123",
+            sound: "default"
         )
         let data = try encoder.encode(original)
         let decoded = try decoder.decode(Alert.self, from: data)
@@ -81,6 +99,10 @@ final class AlertTests: XCTestCase {
         XCTAssertEqual(decoded.onClick, original.onClick)
         XCTAssertEqual(decoded.icon, original.icon)
         XCTAssertEqual(decoded.tags, original.tags)
+        XCTAssertEqual(decoded.source, original.source)
+        XCTAssertEqual(decoded.session, original.session)
+        XCTAssertEqual(decoded.kind, original.kind)
+        XCTAssertEqual(decoded.dedupeKey, original.dedupeKey)
         XCTAssertEqual(decoded.sound, original.sound)
         XCTAssertEqual(
             Int(decoded.createdAt.timeIntervalSince1970),
@@ -106,22 +128,38 @@ final class AlertTests: XCTestCase {
         XCTAssertNil(decoded.onClick)
         XCTAssertNil(decoded.icon)
         XCTAssertTrue(decoded.tags.isEmpty)
+        XCTAssertNil(decoded.source)
+        XCTAssertNil(decoded.session)
+        XCTAssertNil(decoded.kind)
+        XCTAssertNil(decoded.dedupeKey)
         XCTAssertNil(decoded.sound)
     }
 
     // MARK: - JSON Key Mapping
 
     func testJSONKeyMapping() throws {
-        let alert = Alert(title: "T", message: "M", onClick: "open .")
+        let alert = Alert(
+            title: "T",
+            message: "M",
+            onClick: "open .",
+            source: "pi-agent",
+            session: "sess-1",
+            kind: "update",
+            dedupeKey: "pi:update:sess-1"
+        )
         let data = try encoder.encode(alert)
         let json = String(data: data, encoding: .utf8)!
 
         XCTAssertTrue(json.contains("\"on_click\""), "JSON should use 'on_click' not 'onClick'")
         XCTAssertTrue(json.contains("\"created_at\""), "JSON should use 'created_at' not 'createdAt'")
         XCTAssertTrue(json.contains("\"tags\""), "JSON should contain 'tags' key")
+        XCTAssertTrue(json.contains("\"source\""), "JSON should contain 'source' key")
+        XCTAssertTrue(json.contains("\"session\""), "JSON should contain 'session' key")
+        XCTAssertTrue(json.contains("\"kind\""), "JSON should contain 'kind' key")
+        XCTAssertTrue(json.contains("\"dedupe_key\""), "JSON should contain 'dedupe_key' key")
         XCTAssertFalse(json.contains("\"onClick\""))
         XCTAssertFalse(json.contains("\"createdAt\""))
-        XCTAssertFalse(json.contains("\"group\""), "JSON should not contain legacy 'group' key")
+        XCTAssertFalse(json.contains("\"group\""))
     }
 
     func testDecodeFromExternalJSON() throws {
@@ -133,6 +171,10 @@ final class AlertTests: XCTestCase {
           "on_click": "aerospace workspace Terminal",
           "icon": "🤖",
           "tags": ["claude"],
+          "source": "claude",
+          "session": "cc-123",
+          "kind": "update",
+          "dedupe_key": "claude:update:cc-123",
           "sound": "default",
           "created_at": "2026-02-09T12:00:00Z"
         }
@@ -143,35 +185,50 @@ final class AlertTests: XCTestCase {
         XCTAssertEqual(alert.title, "Claude Code")
         XCTAssertEqual(alert.onClick, "aerospace workspace Terminal")
         XCTAssertEqual(alert.tags, ["claude"])
+        XCTAssertEqual(alert.source, "claude")
+        XCTAssertEqual(alert.session, "cc-123")
+        XCTAssertEqual(alert.kind, "update")
+        XCTAssertEqual(alert.dedupeKey, "claude:update:cc-123")
     }
 
-    // MARK: - Backward Compatibility
+    // MARK: - Metadata Optionality
 
-    func testDecodeFromLegacyGroupJSON() throws {
-        let json = """
-        {
-          "id": "1738000000_a1b2c3d4",
-          "title": "Claude Code",
-          "message": "Waiting for input",
-          "group": "claude",
-          "created_at": "2026-02-09T12:00:00Z"
-        }
-        """
-        let alert = try decoder.decode(Alert.self, from: json.data(using: .utf8)!)
-        XCTAssertEqual(alert.tags, ["claude"], "Legacy 'group' should be decoded into tags array")
-    }
-
-    func testDecodeFromLegacyJSON_noGroup() throws {
+    func testDecodeWithoutMetadataFields_setsMetadataNil() throws {
         let json = """
         {
           "id": "1738000000_a1b2c3d4",
           "title": "Test",
           "message": "Hello",
+          "tags": ["work"],
           "created_at": "2026-02-09T12:00:00Z"
         }
         """
         let alert = try decoder.decode(Alert.self, from: json.data(using: .utf8)!)
-        XCTAssertTrue(alert.tags.isEmpty, "No group or tags should result in empty tags array")
+        XCTAssertEqual(alert.tags, ["work"])
+        XCTAssertNil(alert.source)
+        XCTAssertNil(alert.session)
+        XCTAssertNil(alert.kind)
+        XCTAssertNil(alert.dedupeKey)
+    }
+
+    func testDecodeWithoutTags_setsEmptyTags() throws {
+        let json = """
+        {
+          "id": "1738000000_a1b2c3d4",
+          "title": "Test",
+          "message": "Hello",
+          "source": "pi-agent",
+          "session": "sess-1",
+          "kind": "update",
+          "created_at": "2026-02-09T12:00:00Z"
+        }
+        """
+        let alert = try decoder.decode(Alert.self, from: json.data(using: .utf8)!)
+        XCTAssertTrue(alert.tags.isEmpty)
+        XCTAssertEqual(alert.source, "pi-agent")
+        XCTAssertEqual(alert.session, "sess-1")
+        XCTAssertEqual(alert.kind, "update")
+        XCTAssertNil(alert.dedupeKey)
     }
 
     // MARK: - Age Computed Property

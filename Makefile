@@ -1,6 +1,6 @@
 # MungMung Makefile
 
-.PHONY: build build-debug test run clean release icon help
+.PHONY: build build-debug test verify-release run clean release icon help
 
 .DEFAULT_GOAL := help
 
@@ -27,6 +27,13 @@ run: build-debug
 test:
 	@echo "Running tests..."
 	swift build && swift test
+
+## Run release-hardening verification checks
+verify-release:
+	@echo "Running release-hardening verification..."
+	swift build -c release
+	swift test
+	.build/release/MungMung doctor --json >/dev/null
 
 ## Build release app, create DMG, and upload to GitHub Release
 ## Usage: make release VERSION=0.1.0
@@ -91,6 +98,7 @@ help:
 	@echo "  make build-debug       - Build debug binary"
 	@echo "  make run ARGS='help'   - Build and run with arguments"
 	@echo "  make test              - Run unit tests"
+	@echo "  make verify-release    - Run release-hardening verification checks"
 	@echo "  make release VERSION=x.y.z - Build, sign, notarize, release"
 	@echo ""
 	@echo "Install:"
