@@ -2,6 +2,19 @@
 
 All notable changes to `mungmung` are documented in this file.
 
+## [0.7.1] - 2026-03-01
+
+### Fixed
+- `mung version` now correctly resolves app bundle version even when launched via symlinked CLI path (for example `/opt/homebrew/bin/mung`).
+- Version lookup now falls back to reading `CFBundleShortVersionString` from the resolved `*.app/Contents/Info.plist` before using static fallback.
+
+### Tests
+- Added version-resolution coverage for:
+  - bundle-first resolution,
+  - symlinked executable + bundled `Info.plist` resolution,
+  - fallback behavior when no bundle metadata is available.
+- Full suite currently passes: **207 / 207** tests.
+
 ## [0.7.0] - 2026-03-01
 
 ### Added

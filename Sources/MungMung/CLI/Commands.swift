@@ -382,9 +382,43 @@ enum Commands {
         return trimmed
     }
 
+    static func resolveVersion(
+        bundleVersion: String?,
+        executablePath: String,
+        fallbackVersion: String = "0.1.0"
+    ) -> String {
+        if let version = normalized(bundleVersion) {
+            return version
+        }
+
+        let resolvedExecutableURL = URL(fileURLWithPath: executablePath)
+            .resolvingSymlinksInPath()
+
+        if let infoPlistURL = bundledInfoPlistURL(forResolvedExecutableURL: resolvedExecutableURL),
+           let infoDictionary = NSDictionary(contentsOf: infoPlistURL) as? [String: Any],
+           let bundledVersion = normalized(infoDictionary["CFBundleShortVersionString"] as? String) {
+            return bundledVersion
+        }
+
+        return fallbackVersion
+    }
+
     private static func resolvedVersion() -> String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "0.1.0"
+        resolveVersion(
+            bundleVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            executablePath: ProcessInfo.processInfo.arguments.first ?? ""
+        )
+    }
+
+    private static func bundledInfoPlistURL(forResolvedExecutableURL executableURL: URL) -> URL? {
+        guard executableURL.path.contains(".app/Contents/MacOS/") else {
+            return nil
+        }
+
+        return executableURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Info.plist")
     }
 
     private static func isLifecycleDebugEnabled(

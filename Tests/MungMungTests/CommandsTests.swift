@@ -554,6 +554,62 @@ final class CommandsTests: XCTestCase {
 
     // MARK: - version
 
+    func testResolveVersion_prefersBundleVersion() {
+        let version = Commands.resolveVersion(
+            bundleVersion: "1.2.3",
+            executablePath: "/tmp/mung"
+        )
+
+        XCTAssertEqual(version, "1.2.3")
+    }
+
+    func testResolveVersion_readsBundledInfoPlistViaSymlinkedExecutablePath() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mung-resolve-version-\(UUID().uuidString)")
+
+        let macOSDir = tempDir.appendingPathComponent("Test.app/Contents/MacOS", isDirectory: true)
+        try FileManager.default.createDirectory(at: macOSDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let infoPlistURL = tempDir.appendingPathComponent("Test.app/Contents/Info.plist")
+        let plist: [String: Any] = [
+            "CFBundleShortVersionString": "9.9.9",
+        ]
+        let plistData = try PropertyListSerialization.data(
+            fromPropertyList: plist,
+            format: .xml,
+            options: 0
+        )
+        try plistData.write(to: infoPlistURL)
+
+        let executableURL = macOSDir.appendingPathComponent("Test")
+        try Data().write(to: executableURL)
+
+        let symlinkDir = tempDir.appendingPathComponent("bin", isDirectory: true)
+        try FileManager.default.createDirectory(at: symlinkDir, withIntermediateDirectories: true)
+        let symlinkURL = symlinkDir.appendingPathComponent("mung")
+        try FileManager.default.createSymbolicLink(
+            atPath: symlinkURL.path,
+            withDestinationPath: executableURL.path
+        )
+
+        let version = Commands.resolveVersion(
+            bundleVersion: nil,
+            executablePath: symlinkURL.path
+        )
+
+        XCTAssertEqual(version, "9.9.9")
+    }
+
+    func testResolveVersion_usesFallbackWhenNoBundleVersionOrBundledPath() {
+        let version = Commands.resolveVersion(
+            bundleVersion: nil,
+            executablePath: "/tmp/non-bundled-mung"
+        )
+
+        XCTAssertEqual(version, "0.1.0")
+    }
+
     func testVersionPrintsMung() {
         Commands.version(output: outputCapture.capture)
         XCTAssertTrue(outputCapture.text.contains("mung"))
