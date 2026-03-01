@@ -2,7 +2,7 @@
 
 All notable changes to `mungmung` are documented in this file.
 
-## [0.2.0] - 2026-03-01
+## [0.7.0] - 2026-03-01
 
 ### Added
 - First-class agent metadata contract for alerts:

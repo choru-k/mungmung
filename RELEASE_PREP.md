@@ -1,4 +1,4 @@
-# Release Prep (v0.2.0)
+# Release Prep (v0.7.0)
 
 This runbook captures:
 1. final commit grouping
@@ -6,7 +6,7 @@ This runbook captures:
 3. quick verification checkpoints
 
 ## Proposed version
-- **v0.2.0** (minor bump)
+- **v0.7.0** (minor bump)
 
 Rationale: metadata/dedupe/diagnostics surface additions and adapter contract expansion.
 
@@ -114,7 +114,7 @@ git pull --ff-only
 make verify-release
 
 # 2) pick version
-export VERSION=0.2.0
+export VERSION=0.7.0
 
 # 3) create annotated tag
 git tag -a "v${VERSION}" -m "v${VERSION}"
@@ -130,6 +130,6 @@ make release VERSION="${VERSION}"
 ## Quick sign-off checklist
 - [ ] `git status` is clean
 - [ ] `make verify-release` passes
-- [ ] `CHANGELOG.md` is final for `v0.2.0`
-- [ ] tag `v0.2.0` exists locally and on remote
+- [ ] `CHANGELOG.md` is final for `v0.7.0`
+- [ ] tag `v0.7.0` exists locally and on remote
 - [ ] release artifacts generated under `dist/`
