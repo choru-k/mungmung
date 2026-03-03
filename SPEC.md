@@ -225,11 +225,28 @@ This is adapter-level behavior, not a universal mung core guarantee.
 | WezTerm | exact | Deterministic return via WezTerm pane ID |
 | WezTerm + tmux | exact | Deterministic WezTerm + tmux targeting |
 | WezTerm + zellij | exact | Deterministic WezTerm + zellij targeting |
-| Ghostty | app_only | Foreground Ghostty app only |
-| Ghostty (single tab) + tmux | practical_exact | Deterministic if single-tab invariant holds |
-| Ghostty (single tab) + zellij | practical_exact | Deterministic if single-tab invariant holds |
-| Ghostty (multi tab) + tmux | best_effort | tmux context targeted; exact Ghostty tab not guaranteed |
-| Ghostty (multi tab) + zellij | best_effort | zellij context targeted; exact Ghostty tab not guaranteed |
+| Ghostty + AX selector | exact | `mung-ghostty-focus` activates target AX tab/pane |
+| Ghostty (no selector) | app_only | Foreground Ghostty app only |
+| Ghostty + tmux/zellij + AX selector | exact | AX tab/pane focus followed by mux-level focus |
+| Ghostty (single tab) + tmux/zellij (no selector) | practical_exact | Deterministic if single-tab invariant holds |
+| Ghostty (multi tab) + tmux/zellij (no selector) | best_effort | mux context targeted; exact Ghostty tab not guaranteed |
+
+### Ghostty AX helper binary
+
+`mungmung` ships `mung-ghostty-focus` for Ghostty tab/pane activation via macOS Accessibility APIs.
+
+```bash
+mung-ghostty-focus --target "ghostty-pane:003"
+```
+
+Selector contract:
+- Primary input: `--target <selector>`
+- Env fallback: `MUNG_GHOSTTY_TARGET` (or `PI_MUNG_GHOSTTY_SELECTOR`)
+- Optional mode: `--match exact|prefix|contains|regex|glob`
+
+Failure contract:
+- Retry once then fail (configurable with `--retry`)
+- Returns non-zero with explicit AX failure reason
 
 ### Notification features (native UNUserNotificationCenter)
 
@@ -257,7 +274,7 @@ Example plugin lives in `examples/sketchybar-plugin.sh`. User's actual plugin li
 - Homebrew cask (it's an .app bundle)
 - Sign + notarize with Developer ID (reuse existing pipeline from ClaudeZellijWhip)
 - `brew install --cask choru-k/tap/mungmung`
-- Post-install: symlink `mung` → `MungMung.app/Contents/MacOS/mung` (or Homebrew `binary` stanza)
+- Post-install: symlink `mung` → `MungMung.app/Contents/MacOS/MungMung` and `mung-ghostty-focus` → `MungMung.app/Contents/MacOS/MungGhosttyFocus` (or Homebrew `binary` stanzas)
 
 ## Dotfiles integration
 
@@ -267,7 +284,7 @@ Example plugin lives in `examples/sketchybar-plugin.sh`. User's actual plugin li
 | `claude/settings.json` | Update notification hooks to use `mung add` |
 | `sketchybar/plugins/mung_alerts.sh` | New — sketchybar plugin |
 | `sketchybar/sketchybarrc` | Register `mung_alert_change` event + manager item |
-| `symlink.sh` | Add symlink for `mung` CLI if not handled by Homebrew |
+| `symlink.sh` | Add symlinks for `mung` and `mung-ghostty-focus` CLIs if not handled by Homebrew |
 
 ## Example usage
 

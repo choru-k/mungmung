@@ -128,11 +128,28 @@ This matrix documents the current `mung-notify` focus behavior (the `on_click` s
 | WezTerm | exact | Pane-targeted activation via WezTerm pane ID |
 | WezTerm + tmux | exact | WezTerm pane focus + tmux session/window/pane |
 | WezTerm + zellij | exact | WezTerm pane focus + zellij tab/pane |
-| Ghostty | app_only | Brings Ghostty frontmost only |
-| Ghostty (single tab) + tmux | practical_exact | Deterministic if single-tab invariant holds |
-| Ghostty (single tab) + zellij | practical_exact | Deterministic if single-tab invariant holds |
-| Ghostty (multi tab) + tmux | best_effort | tmux target respected; originating Ghostty tab not guaranteed |
-| Ghostty (multi tab) + zellij | best_effort | zellij target respected; originating Ghostty tab not guaranteed |
+| Ghostty + AX selector | exact | `mung-ghostty-focus` activates the matching Ghostty AX tab/pane |
+| Ghostty (no selector) | app_only | Brings Ghostty frontmost only |
+| Ghostty + tmux/zellij + AX selector | exact | AX selector chooses tab first, mux targeting applies after |
+| Ghostty (single tab) + tmux/zellij (no selector) | practical_exact | Deterministic only if single-tab invariant holds |
+| Ghostty (multi tab) + tmux/zellij (no selector) | best_effort | mux target is respected, originating Ghostty tab not guaranteed |
+
+### Ghostty AX helper (`mung-ghostty-focus`)
+
+`mungmung` ships a Swift Accessibility helper binary for Ghostty targeting:
+
+```bash
+mung-ghostty-focus --target "ghostty-pane:003"
+```
+
+Selector inputs:
+- CLI: `--target <selector>` (primary)
+- Env fallback: `MUNG_GHOSTTY_TARGET` (or `PI_MUNG_GHOSTTY_SELECTOR`)
+- Match mode: `--match exact|prefix|contains|regex|glob` (defaults to `exact`, auto-`glob` when selector contains `*`/`?`)
+
+Behavior:
+- Retries once before failing (`--retry` controls retry count)
+- Exits non-zero with actionable errors (permission missing / selector not found / AX action failure)
 
 ## Examples
 
