@@ -7,12 +7,20 @@ struct MenuBarLabel: View {
         ZStack(alignment: .topTrailing) {
             menuBarIcon
             if count > 0 {
-                Circle()
-                    .fill(.red)
-                    .frame(width: 6, height: 6)
-                    .offset(x: 2, y: -2)
+                Text(badgeText)
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 3)
+                    .frame(minWidth: 12, minHeight: 12)
+                    .background(Capsule().fill(.red))
+                    .offset(x: 8, y: -4)
+                    .accessibilityLabel("\(count) pending alerts")
             }
         }
+    }
+
+    private var badgeText: String {
+        count > 99 ? "99+" : "\(count)"
     }
 
     private var menuBarIcon: some View {
