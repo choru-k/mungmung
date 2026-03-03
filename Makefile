@@ -56,16 +56,18 @@ endif
 # Install
 # =============================================================================
 
-## Install mung CLI to /usr/local/bin
+## Install mung CLIs to /usr/local/bin
 install: build
-	@echo "Installing mung to /usr/local/bin..."
+	@echo "Installing mung CLIs to /usr/local/bin..."
 	cp .build/release/MungMung /usr/local/bin/mung
+	if [ -f .build/release/MungGhosttyFocus ]; then cp .build/release/MungGhosttyFocus /usr/local/bin/mung-ghostty-focus; fi
 	@echo "Installed. Run: mung help"
 
-## Uninstall mung CLI
+## Uninstall mung CLIs
 uninstall:
 	rm -f /usr/local/bin/mung
-	@echo "Uninstalled mung."
+	rm -f /usr/local/bin/mung-ghostty-focus
+	@echo "Uninstalled mung CLIs."
 
 # =============================================================================
 # Utilities
@@ -102,8 +104,8 @@ help:
 	@echo "  make release VERSION=x.y.z - Build, sign, notarize, release"
 	@echo ""
 	@echo "Install:"
-	@echo "  make install           - Install mung to /usr/local/bin"
-	@echo "  make uninstall         - Remove mung from /usr/local/bin"
+	@echo "  make install           - Install mung and mung-ghostty-focus to /usr/local/bin"
+	@echo "  make uninstall         - Remove mung and mung-ghostty-focus from /usr/local/bin"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make icon              - Regenerate app icon with squircle mask"

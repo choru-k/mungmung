@@ -20,8 +20,9 @@ cask "mungmung" do
 
   app "MungMung.app"
 
-  # Symlink the CLI binary as 'mung'
+  # Symlink the CLI binaries
   binary "#{appdir}/MungMung.app/Contents/MacOS/MungMung", target: "mung"
+  binary "#{appdir}/MungMung.app/Contents/MacOS/MungGhosttyFocus", target: "mung-ghostty-focus"
 
   zap trash: [
     "~/.local/share/mung",
@@ -35,5 +36,8 @@ cask "mungmung" do
       mung add --title "Hello" --message "World"
       mung list
       mung help
+
+      # Ghostty Accessibility helper
+      mung-ghostty-focus --target "ghostty-pane:003"
   EOS
 end

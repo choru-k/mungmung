@@ -7,7 +7,8 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "MungMung", targets: ["MungMung"])
+        .executable(name: "MungMung", targets: ["MungMung"]),
+        .executable(name: "MungGhosttyFocus", targets: ["MungGhosttyFocus"])
     ],
     targets: [
         .executableTarget(
@@ -19,6 +20,10 @@ let package = Package(
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
+        ),
+        .executableTarget(
+            name: "MungGhosttyFocus",
+            path: "Sources/MungGhosttyFocus"
         ),
         .testTarget(
             name: "MungMungTests",

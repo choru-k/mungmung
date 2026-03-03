@@ -9,6 +9,7 @@ final class CLIIntegrationTests: XCTestCase {
 
     var tempDir: URL!
     var binaryURL: URL!
+    var ghosttyHelperURL: URL!
 
     override func setUp() {
         super.setUp()
@@ -28,6 +29,18 @@ final class CLIIntegrationTests: XCTestCase {
         } else {
             // Fallback: try relative to working directory
             binaryURL = URL(fileURLWithPath: ".build/debug/MungMung")
+        }
+
+        let debugGhosttyHelper = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent()  // MungMungTests/
+            .deletingLastPathComponent()  // Tests/
+            .deletingLastPathComponent()  // project root
+            .appendingPathComponent(".build/debug/MungGhosttyFocus")
+
+        if FileManager.default.fileExists(atPath: debugGhosttyHelper.path) {
+            ghosttyHelperURL = debugGhosttyHelper
+        } else {
+            ghosttyHelperURL = URL(fileURLWithPath: ".build/debug/MungGhosttyFocus")
         }
     }
 
@@ -66,6 +79,31 @@ final class CLIIntegrationTests: XCTestCase {
         )
     }
 
+    @discardableResult
+    func runGhosttyHelper(_ args: String...) -> (stdout: String, stderr: String, exitCode: Int32) {
+        let process = Process()
+        process.executableURL = ghosttyHelperURL
+        process.arguments = Array(args)
+        process.environment = ProcessInfo.processInfo.environment
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try! process.run()
+        process.waitUntilExit()
+
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        return (
+            stdout: String(data: stdoutData, encoding: .utf8) ?? "",
+            stderr: String(data: stderrData, encoding: .utf8) ?? "",
+            exitCode: process.terminationStatus
+        )
+    }
+
     // MARK: - help
 
     func testHelpExitsZeroAndContainsUsage() {
@@ -78,6 +116,27 @@ final class CLIIntegrationTests: XCTestCase {
         let result = run("--help")
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertTrue(result.stdout.contains("Usage:"))
+    }
+
+    // MARK: - Ghostty helper
+
+    func testGhosttyHelperHelpExitsZeroAndContainsUsage() {
+        let result = runGhosttyHelper("--help")
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stdout.contains("Usage:"))
+    }
+
+    func testGhosttyHelperMissingTargetExitsTwo() {
+        let result = runGhosttyHelper()
+        XCTAssertEqual(result.exitCode, 2)
+        XCTAssertTrue(result.stdout.contains("Usage:"))
+        XCTAssertTrue(result.stderr.contains("Missing selector"))
+    }
+
+    func testGhosttyHelperInvalidMatchExitsTwo() {
+        let result = runGhosttyHelper("--target", "ghostty-pane:001", "--match", "invalid")
+        XCTAssertEqual(result.exitCode, 2)
+        XCTAssertTrue(result.stderr.contains("Invalid --match value"))
     }
 
     // MARK: - version

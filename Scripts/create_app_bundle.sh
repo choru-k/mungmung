@@ -27,8 +27,14 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
-# Copy binary
+# Copy main binary
 cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+
+# Copy optional Ghostty AX helper binary when present
+HELPER_BINARY="$(dirname "$BINARY")/MungGhosttyFocus"
+if [ -f "$HELPER_BINARY" ]; then
+    cp "$HELPER_BINARY" "$APP_BUNDLE/Contents/MacOS/MungGhosttyFocus"
+fi
 
 # Copy Info.plist
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
