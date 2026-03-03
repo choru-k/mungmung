@@ -59,13 +59,27 @@ echo ""
 echo "=== Step 2: Signing App Bundle ==="
 echo "Signing with: $DEVELOPER_ID"
 
-codesign --force --options runtime \
+# Sign embedded executables first (e.g. helper tools in Contents/MacOS)
+for EMBEDDED_BIN in "$APP_PATH/Contents/MacOS"/*; do
+    [ -f "$EMBEDDED_BIN" ] || continue
+    if [ "$(basename "$EMBEDDED_BIN")" = "MungMung" ]; then
+        continue
+    fi
+
+    echo "Signing embedded executable: $(basename "$EMBEDDED_BIN")"
+    codesign --force --options runtime --timestamp \
+        --sign "$DEVELOPER_ID" \
+        "$EMBEDDED_BIN"
+done
+
+# Sign the app bundle (main executable + bundle metadata/entitlements)
+codesign --force --options runtime --timestamp \
     --sign "$DEVELOPER_ID" \
     --entitlements "$ENTITLEMENTS" \
     "$APP_PATH"
 
 echo "App signed successfully"
-codesign --verify --verbose "$APP_PATH"
+codesign --verify --deep --strict --verbose "$APP_PATH"
 
 # Step 3: Create DMG
 echo ""
@@ -83,7 +97,7 @@ fi
 # Step 4: Sign DMG
 echo ""
 echo "=== Step 4: Signing DMG ==="
-codesign --force --sign "$DEVELOPER_ID" "$DMG_FILE"
+codesign --force --timestamp --sign "$DEVELOPER_ID" "$DMG_FILE"
 echo "DMG signed successfully"
 
 # Step 5: Notarize
