@@ -29,25 +29,32 @@ final class AlertViewModel {
 
     func startPolling() {
         reload()
-        startTimer()
 
-        notificationObserver = NotificationCenter.default.addObserver(
-            forName: .alertsDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.reload()
+        if timer == nil {
+            startTimer()
+        }
+
+        if notificationObserver == nil {
+            notificationObserver = NotificationCenter.default.addObserver(
+                forName: .alertsDidChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.reload()
+                }
             }
         }
 
-        pollingObserver = NotificationCenter.default.addObserver(
-            forName: .pollingIntervalDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.restartTimer()
+        if pollingObserver == nil {
+            pollingObserver = NotificationCenter.default.addObserver(
+                forName: .pollingIntervalDidChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.restartTimer()
+                }
             }
         }
     }

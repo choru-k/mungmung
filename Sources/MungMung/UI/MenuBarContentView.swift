@@ -29,10 +29,8 @@ struct MenuBarContentView: View {
         .onAppear {
             transitionState = .menuOpen
             cancelSettingsTransitionFallback()
-            viewModel.startPolling()
         }
         .onDisappear {
-            viewModel.stopPolling()
             if transitionState == .transitioningToSettings {
                 openSettingsAfterMenuClose()
             }

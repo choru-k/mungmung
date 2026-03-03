@@ -4,16 +4,15 @@ struct MenuBarLabel: View {
     let count: Int
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        HStack(spacing: 3) {
             menuBarIcon
             if count > 0 {
                 Text(badgeText)
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 3)
-                    .frame(minWidth: 12, minHeight: 12)
+                    .padding(.horizontal, 4)
+                    .frame(minHeight: 14)
                     .background(Capsule().fill(.red))
-                    .offset(x: 8, y: -4)
                     .accessibilityLabel("\(count) pending alerts")
             }
         }

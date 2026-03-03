@@ -35,10 +35,13 @@ struct MungMungApp: App {
     @State private var settings: AppSettings
     @State private var viewModel: AlertViewModel
 
+    @MainActor
     init() {
         let s = AppSettings()
+        let vm = AlertViewModel(settings: s)
+        vm.startPolling()
         _settings = State(initialValue: s)
-        _viewModel = State(initialValue: AlertViewModel(settings: s))
+        _viewModel = State(initialValue: vm)
     }
 
     var body: some Scene {
